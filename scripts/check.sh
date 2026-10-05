@@ -10,5 +10,6 @@ npm --prefix frontend run check:qq
 node --experimental-strip-types frontend/scripts/check-bokeh-optimization.mjs
 node --experimental-strip-types frontend/scripts/check-cover-cache.mjs
 node --experimental-strip-types frontend/scripts/check-instance-visibility.mjs
+node --experimental-strip-types --test frontend/scripts/check-motion-resolution.mjs
 ./scripts/cargo.sh test --locked --manifest-path qq-connector/Cargo.toml
 ./scripts/cargo.sh test --locked --manifest-path src-tauri/Cargo.toml

@@ -6,6 +6,7 @@ import { MUSIC_COVER, createAlbumPrintMaterial } from "./music-model.ts";
 
 // Print on the glass surface. No transmitting/frosted layer sits over the image.
 export const COVER_SIZE = MUSIC_COVER;
+type PrintedCover = {key:string;canvas:HTMLCanvasElement;texture:THREE.CanvasTexture;users:number;retired:boolean;disposed:boolean};
 type CoverImage = { source: HTMLCanvasElement; width: number; height: number };
 const COVER_PAINT_SIZE = 1024;
 // Use the same UV margin at every texture resolution. A fixed two-pixel inset
@@ -93,10 +94,10 @@ export class CoverAtlas {
   readonly array: THREE.InstancedMesh;
   readonly selected: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshLambertMaterial>;
   private readonly atlasCanvas = document.createElement("canvas");
-  private readonly selectedCanvas = document.createElement("canvas");
+  private selectedCanvas = document.createElement("canvas");
   private readonly tileCanvas = document.createElement("canvas");
   private readonly atlas: THREE.CanvasTexture;
-  private readonly selectedTexture: THREE.CanvasTexture;
+  private selectedTexture: THREE.CanvasTexture;
   private readonly pendingImages = new Map<string, Promise<CoverImage | undefined>>();
   private readonly decodedImages = new Map<string, CoverImage | undefined>();
   private readonly slotKeys: (string | undefined)[];
@@ -107,8 +108,12 @@ export class CoverAtlas {
   private uploadPosition = new THREE.Vector2();
   private atlasInitialized = false;
   private uploads = { tiles: 0, bytes: 0 };
-  get cacheStats() { return {uniqueTiles:this.tiles.size,logicalSlots:this.slotKeys.length,...this.uploads}; }
+  get cacheStats() { return {uniqueTiles:this.tiles.size,logicalSlots:this.slotKeys.length,...this.uploads,printHits:this.printHits,printMisses:this.printMisses,printedCovers:this.printCache.size}; }
   private readonly recordKeys = new WeakMap<ArchiveRecord, string>();
+  private readonly printCache = new Map<string,PrintedCover>();
+  private selectedPrint?:PrintedCover;
+  private printHits=0;
+  private printMisses=0;
   private selectedRecord?: ArchiveRecord;
   private selectedKey?: string;
   private generation = 0;
@@ -343,51 +348,62 @@ export class CoverAtlas {
     this.dirtyTiles.clear();
   }
 
+  private releasePrint(entry:PrintedCover) {
+    entry.users--;
+    if(entry.users===0&&entry.retired&&!entry.disposed){entry.texture.dispose();entry.disposed=true;}
+    this.trimPrints();
+  }
+  private trimPrints() {
+    for(const [key,entry] of this.printCache) {
+      if(this.printCache.size<=12)break;
+      if(entry.users)continue;
+      this.printCache.delete(key);entry.retired=true;entry.disposed=true;entry.texture.dispose();
+    }
+  }
   async select(record: ArchiveRecord | undefined) {
-    this.selectedRecord = record;
-    const key = this.recordKey(record);
-    if (this.selectedKey === key) return;
-    const generation = this.generation;
-    const cached = this.cachedImage(record?.album?.coverUrl);
-    if (cached) paintCover(this.selectedCanvas, record, cached);
-    else if (!this.copyCover(this.selectedCanvas, key)) paintCover(this.selectedCanvas, record);
-    this.selectedKey = key;
-    this.selectedTexture.needsUpdate = true;
-    if (cached) return;
-    const image = await this.loadImage(record?.album?.coverUrl);
-    if (
-      !image ||
-      this.disposed ||
-      generation !== this.generation ||
-      this.selectedKey !== key
-    )
-      return;
-    paintCover(this.selectedCanvas, record, image);
-    this.selectedTexture.needsUpdate = true;
+    this.selectedRecord=record;const key=this.recordKey(record);
+    if(this.selectedKey===key)return;
+    let entry=this.printCache.get(key);
+    if(entry){this.printHits++;this.printCache.delete(key);this.printCache.set(key,entry);}
+    else {
+      this.printMisses++;
+      const canvas=document.createElement("canvas");canvas.width=COVER_PAINT_SIZE;canvas.height=COVER_PAINT_SIZE;
+      const cached=this.cachedImage(record?.album?.coverUrl);
+      if(cached)paintCover(canvas,record,cached);
+      else if(!this.copyCover(canvas,key))paintCover(canvas,record);
+      const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=this.selectedTexture.anisotropy;
+      entry={key,canvas,texture,users:0,retired:false,disposed:false};this.printCache.set(key,entry);
+      const generation=this.generation,print=entry;
+      if(!cached)void this.loadImage(record?.album?.coverUrl).then(image=>{
+        if(!image||this.disposed||generation!==this.generation||print.disposed)return;
+        paintCover(print.canvas,record,image);print.texture.needsUpdate=true;
+      });
+    }
+    entry.users++;
+    const old=this.selectedPrint;
+    if(!old)this.selectedTexture.dispose();
+    this.selectedPrint=entry;this.selectedCanvas=entry.canvas;this.selectedTexture=entry.texture;
+    this.selected.material.map=entry.texture;this.selectedKey=key;
+    if(old)this.releasePrint(old);else this.trimPrints();
   }
 
   snapshot(mesh: THREE.Mesh) {
-    const canvas = document.createElement("canvas");
-    canvas.width = this.selectedCanvas.width;
-    canvas.height = this.selectedCanvas.height;
-    canvas.getContext("2d")!.drawImage(this.selectedCanvas, 0, 0);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = this.selectedTexture.anisotropy;
-    mesh.material = this.selected.material.clone();
-    mesh.material.onBeforeCompile = this.selected.material.onBeforeCompile;
-    mesh.material.customProgramCacheKey = this.selected.material.customProgramCacheKey;
-    (mesh.material as THREE.MeshLambertMaterial).map = texture;
-    const record = this.selectedRecord;
-    mesh.userData.coverDisposed = false;
-    void this.loadImage(record?.album?.coverUrl).then((image) => {
-      if (!image || mesh.userData.coverDisposed || this.disposed) return;
-      paintCover(canvas, record, image);
-      texture.needsUpdate = true;
-    });
+    // Outgoing cards retain the same immutable painted cover. A rapid return to
+    // an album now rebinds its GPU texture instead of repainting/uploading 4 MiB.
+    const entry=this.selectedPrint;if(!entry)return;
+    entry.users++;
+    mesh.material=this.selected.material.clone();
+    mesh.material.onBeforeCompile=this.selected.material.onBeforeCompile;
+    mesh.material.customProgramCacheKey=this.selected.material.customProgramCacheKey;
+    (mesh.material as THREE.MeshLambertMaterial).map=entry.texture;
+    mesh.userData.coverDisposed=false;
+    let released=false;
+    mesh.userData.releaseCoverPrint=()=>{if(!released){released=true;this.releasePrint(entry);}};
   }
 
   reset() {
+    for(const entry of this.printCache.values()){entry.retired=true;if(!entry.users&&!entry.disposed){entry.texture.dispose();entry.disposed=true;}}
+    this.printCache.clear();
     this.generation++;
     this.slotKeys.fill(undefined);
     this.tiles.reset();this.dirtyTiles.clear();
@@ -402,7 +418,9 @@ export class CoverAtlas {
     this.decodedImages.clear();
     this.atlas.dispose();
     this.uploadTexture.dispose();
-    this.selectedTexture.dispose();
+    for(const entry of this.printCache.values()){entry.retired=true;if(!entry.users&&!entry.disposed){entry.texture.dispose();entry.disposed=true;}}
+    this.printCache.clear();
+    if(this.selectedPrint){this.releasePrint(this.selectedPrint);this.selectedPrint=undefined;}else this.selectedTexture.dispose();
     this.array.geometry.dispose();
     (this.array.material as THREE.Material).dispose();
     this.selected.geometry.dispose();

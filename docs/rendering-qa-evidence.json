@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-05",
+  "sourceCommit": "11a6aa7d188a1d01a167377a5f13772f5bc44b01",
+  "localRoot": ".local/default-qq-qa",
+  "scope": "Selected local evidence; binaries and captures are not committed. Partial QA, not performance acceptance.",
+  "files": [
+    {
+      "path": "build-source-final.json",
+      "sha256": "ed69e2fbd938dacec0b0a3ade78dd758e153ba20fa9806774206c5bcce93036a",
+      "bytes": 573
+    },
+    {
+      "path": "harness-final.diff",
+      "sha256": "ffd9bdca6e0840f202347f2b7846256864a64ed8998bbb9c4a230a27b7fee2f1",
+      "bytes": 2301
+    },
+    {
+      "path": "runtime-final.log",
+      "sha256": "7e501e309aa3971905979278c0494083c16bab804cd1deecc8e8113cb4e28f60",
+      "bytes": 52
+    },
+    {
+      "path": "data-final/benchmarks/20261005-123439-optimized-stress-night.json",
+      "sha256": "28dede18b6bbfc2e106e0c277b250058e5df4f3da9a2a3c9fd5487d3f95b631d",
+      "bytes": 305113
+    },
+    {
+      "path": "evidence-final/q1-empty.png",
+      "sha256": "cf7f788cf3b180a574fc8d5593f067d7029842ecad1ced4f3d6018e030e77fe9",
+      "bytes": 65197
+    },
+    {
+      "path": "evidence-final/q1-default-settings.txt",
+      "sha256": "d86acfcc01c71ea6f1841312faa163c328e3aacea2136159fec02de71d1af098",
+      "bytes": 404
+    },
+    {
+      "path": "evidence-final/q1-default-controls.png",
+      "sha256": "ce5a6c6155fa711812da68cc0b5202fc02900cba23fb723c3cb5200e743b8930",
+      "bytes": 72065
+    },
+    {
+      "path": "evidence-final/q2-bursts-contact.png",
+      "sha256": "bfd5034a72ed115e48e02c0fc02dec5ca62243bbc07937a13eb34121d34287e9",
+      "bytes": 641371
+    },
+    {
+      "path": "evidence-final/q2-day-native-keys.json",
+      "sha256": "bc2e407e054d1d4f94c4579f648f262c2e430a5ae5ee04b85f27bd20bf59cca9",
+      "bytes": 1321
+    },
+    {
+      "path": "evidence-final/q2-night-native-keys.json",
+      "sha256": "9d019235eea97d13a5d16d747236ef0679763c581640230da90ed6733d7c09f2",
+      "bytes": 1321
+    },
+    {
+      "path": "evidence-final/q3-capture-times.json",
+      "sha256": "1a02f88da05612b76c78bbbaa4dfe09a0444edb5afcb25d61992642dd98dc49c",
+      "bytes": 35232
+    },
+    {
+      "path": "evidence-final/q3-sampled-contact.png",
+      "sha256": "2ab66af6ef08acddc2c1ef78fe68daedaf42306f340f05be8edd52924a382a54",
+      "bytes": 977130
+    },
+    {
+      "path": "evidence-final/q3-final.png",
+      "sha256": "46d6542e00c31f315050634f8e8528f56f7b9da09c12477fb9eb607c62570b59",
+      "bytes": 115575
+    },
+    {
+      "path": "evidence-final/q2b-forward-contact.png",
+      "sha256": "d454745917ea6becf9beca3fdf0a993cc8daf9eb191e0bdf70aa5060600fbe31",
+      "bytes": 826767
+    },
+    {
+      "path": "evidence-final/q2b-reverse-contact.png",
+      "sha256": "5389a2ab04a6340320759e8596bcd49b86235f66cb400996def95cfa16c186cc",
+      "bytes": 773856
+    },
+    {
+      "path": "evidence-final/q2b-transitions-contact.png",
+      "sha256": "2e9b55c71609a8e8e8f2eb300e4fb65bca28fd246adc62362303ef0719917f38",
+      "bytes": 737140
+    },
+    {
+      "path": "evidence-final/q2b-observations.json",
+      "sha256": "b8de0f4fec9d0ff423913db57e00aa9f01003bbecf7b5b10016c7447d590b66a",
+      "bytes": 3805
+    },
+    {
+      "path": "evidence-final/q2b-reversal-times.json",
+      "sha256": "31a68bbab4e9916fe2b3f5975def4fbd090dcc8ee2c7d3ca94b1c7cb39f57c42",
+      "bytes": 2021
+    },
+    {
+      "path": "evidence-final/q4-drag-before.png",
+      "sha256": "58b51a1d876ebf1fb22933fcf567f1fb3504d40aeb5208c762d6cdf6e3289627",
+      "bytes": 121320
+    },
+    {
+      "path": "evidence-final/q4-drag-right.png",
+      "sha256": "97e32089fb8ec340453cd1abe423f331783ac2e539ecd88065f6b8e9be412b7f",
+      "bytes": 123385
+    }
+  ]
+}

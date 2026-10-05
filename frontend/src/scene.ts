@@ -3,6 +3,7 @@ import { captureForMetal } from "./metal-capture";
 import { installFusedOutput } from "./fused-output";
 import { TransmissionPrepass } from "./transmission-prepass";
 import { GLFrameCapture } from "./gl-frame-capture";
+import { MetalController } from "./metal-controller";
 import * as THREE from "three";
 import { InstanceVisibility } from "./instance-visibility";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -15,6 +16,7 @@ import { optimizeBokeh } from "./bokeh-optimization";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
 import { normalizeQuality, type RenderQuality } from "./render-quality";
+import { MotionResolution } from "./motion-resolution";
 import { applyTextureQuality, resizeQuality } from "./quality-renderer";
 import { CardAppearance } from "./appearance";
 import { configureInternalOptics } from "./internal-optics";
@@ -72,6 +74,7 @@ export const MUSIC_INSPECTION_LIFT = MUSIC_MODEL.height + 0.12;
 const MUSIC_DETAIL_ELEVATION = THREE.MathUtils.degToRad(20);
 const MUSIC_ALBUM_SWITCH_RATE = 9;
 export class ArchiveScene {
+  readonly nativeMetal: MetalController;
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   // The reference uses a long lens 72–140 units from the cassette. A 0.1 near
@@ -82,6 +85,8 @@ export class ArchiveScene {
   private ao: SSAOPass;
   private bokeh: BokehPass;
   renderingOptimized = true;
+  readonly motionResolution = new MotionResolution();
+  private fullResolutionPixels = 0;
   // Kept as developer experiments: matched Retina playback did not establish
   // an end-to-end speedup, even though Metal's isolated fused pass is faster.
   postFusionEnabled = false;
@@ -179,8 +184,17 @@ export class ArchiveScene {
       powerPreference: "high-performance",
     });
     const nativeFrameCapture = new GLFrameCapture(this.renderer);
+    this.nativeMetal = new MetalController(this.renderer, nativeFrameCapture);
     let frameCapturePending = false;
     window.addEventListener("keydown", event => {
+      if(event.ctrlKey && event.altKey && event.code === "KeyN" && this.loaded) {
+        event.preventDefault();
+        if (this.motionResolution.scale !== 1) { this.motionResolution.reset();this.resize(); }
+        this.renderer.shadowMap.needsUpdate = true;
+        void this.nativeMetal.toggle(() => this.renderCurrentFrame(), {theme:this.theme,phase:this.musicPresentationPhase,quality:this.quality,optimized:this.renderingOptimized})
+          .catch(error => console.error("Native Metal preparation",error));
+        return;
+      }
       if (!event.ctrlKey || !event.altKey || event.code !== "KeyG" || !this.loaded || frameCapturePending) return;
       event.preventDefault(); frameCapturePending = true;
       document.documentElement.dataset.glCapture = "running";
@@ -798,6 +812,12 @@ export class ArchiveScene {
     applyTextureQuality(this.scene, this.renderer, quality);
     this.resize();
   }
+  async setSmoothMotion(enabled:boolean) {
+    if (enabled && this.nativeMetal.stats.active) await this.nativeMetal.stop();
+    this.motionResolution.enabled=enabled;
+    this.motionResolution.reset();
+    this.resize();
+  }
   private cellPosition(cell: ArchiveCell) {
     return new THREE.Vector3(
       (cell.lane - 2) * COLUMN_SPACING,
@@ -875,7 +895,7 @@ export class ArchiveScene {
       const cover = group.children.find((child) => child.userData.albumCover) as THREE.Mesh | undefined;
       if (cover) this.covers?.snapshot(cover);
       const label = group.children.find((child) => child.userData.printedLabel) as THREE.Mesh | undefined;
-      if (label) {
+      if (label && label.visible) {
         const canvas = document.createElement("canvas");
         canvas.width = 1024;
         canvas.height = 440;
@@ -980,9 +1000,10 @@ export class ArchiveScene {
       this.renderer,
       this.composer,
       this.container,
-      this.quality,
+      {...this.quality,scale:this.quality.scale*this.motionResolution.scale},
       this.benchmarkDevicePixelRatio,
     );
+    this.fullResolutionPixels=dimensions.width*dimensions.height/(this.motionResolution.scale**2);
     this.ao.setSize(
       Math.max(1, Math.floor(dimensions.width * this.quality.aoResolution)),
       Math.max(1, Math.floor(dimensions.height * this.quality.aoResolution)),
@@ -996,12 +1017,15 @@ export class ArchiveScene {
         ? this.light.shadow.mapSize.x
         : 0,
       depthOfField: this.bokeh.enabled ? this.quality.depthOfField : 0,
+      motionScale:this.motionResolution.scale,
     });
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
   private bindPointer() {
-    const canvas = this.renderer.domElement;
+    // The hit surface remains available when Metal replaces the WebGL canvas.
+    const canvas = this.container;
+    canvas.style.touchAction = "none";
     let startX = 0,
       startY = 0;
     let activePointer: number | null = null, previousX = 0, started = 0, cancelled = false;
@@ -1728,13 +1752,17 @@ export class ArchiveScene {
       this.renderer.shadowMap.needsUpdate = true;
     this.instanceVisibility.capture([...this.instances,...(this.covers?[this.covers.array]:[])]);
     this.covers?.flushUploads(this.renderer);
+    const oldScale=this.motionResolution.scale;
+    this.motionResolution.update(time,this.interactionPose().concat(this.rotation),
+      !this.reduced && !this.nativeMetal.preparing && !this.nativeMetal.stats.active,this.fullResolutionPixels,idle);
+    if (this.motionResolution.scale!==oldScale) this.resize();
     this.renderCurrentFrame();
     if (this.pendingHover) {
       this.pendingHover = false;
       if (this.reveal >= 0.8 && this.detail <= 0.2 && records.length) {
         this.raycaster.setFromCamera(this.cursor, this.camera);
         const hit = this.raycaster.intersectObjects([this.instances[0], this.model], true)[0];
-        this.renderer.domElement.style.cursor = hit ? "pointer" : "default";
+        this.container.style.cursor = hit ? "pointer" : "default";
         this.onHover?.(hit ? hit.instanceId !== undefined
           ? fileAtCell(this.cells[this.instanceVisibility.logicalSlot(hit.object, hit.instanceId)])
           : fileAtSlot(this.selectedSlot) : null);
@@ -1742,6 +1770,8 @@ export class ArchiveScene {
     }
   }
   private renderCurrentFrame() {
+    this.transmissionPrepass!.beginFrame();
+    this.transmissionPrepass!.batch = true;
     this.transmissionPrepass!.enabled = musicLibrary && this.renderingOptimized && this.transmissionDepthEnabled;
     const fuse = this.renderingOptimized && this.postFusionEnabled && this.bokeh.enabled
       && !this.smaa.enabled && this.renderer.toneMapping === THREE.ACESFilmicToneMapping
@@ -1761,7 +1791,7 @@ export class ArchiveScene {
       this.scene.updateMatrixWorld();
       this.scene.matrixWorldAutoUpdate = false;
     }
-    try { this.composer.render(); }
+    try { this.nativeMetal.render(() => this.composer.render()); }
     finally { this.scene.matrixWorldAutoUpdate = automatic; }
   }
   profileRenderPasses() {

@@ -1,0 +1,159 @@
+{
+  "issue": 7,
+  "baselineCommit": "7ca1e5f653d646a0ef8cb068565771306509c805",
+  "source": "Frozen native-rendering source snapshot; no generated build overlay",
+  "snapshotCreatedAt": "2026-10-05T11:45:13.324355+00:00",
+  "files": {
+    "frontend/scripts/check-cover-print-cache.mjs": {
+      "sha256": "d4828c59a40d77e1aea9ca9aa736a38b517f424ef00ed26bb96ddf4fa0b55eec",
+      "bytes": 2124
+    },
+    "frontend/scripts/check-metal-data.mjs": {
+      "sha256": "dc283e171bbdf5663197cde7d5b8d9132ac584b16886bc50848ea21101917df3",
+      "bytes": 818
+    },
+    "frontend/scripts/check-motion-resolution.mjs": {
+      "sha256": "2a26555077790a8663addcda5101449d3680a200c20809e70b31109efc892e30",
+      "bytes": 1084
+    },
+    "frontend/scripts/check-transmission-prepass.mjs": {
+      "sha256": "92b66f633315571335ac80707d62d917451bb47be4ec9dabad83863eaedabd28",
+      "bytes": 2702
+    },
+    "frontend/src/appearance.ts": {
+      "sha256": "2eb5ba6414b93076df9113aec7a091a3656d002faf32a06cd0afbf3c5c75b0ba",
+      "bytes": 10108
+    },
+    "frontend/src/cover-atlas.ts": {
+      "sha256": "ffd5eb93c99d9caaf2dd1af305475447cd9cea6375f7abe3125141356c1085d7",
+      "bytes": 18641
+    },
+    "frontend/src/gl-frame-capture.ts": {
+      "sha256": "d871db00a28bd5147237851bd0a5392478cfb9b1b50d2d739570eb3a190ea2e8",
+      "bytes": 20020
+    },
+    "frontend/src/metal-controller.ts": {
+      "sha256": "0f89b3b5a616f40a6f82160764a993b323e81025b4e724bf9bd5ba361bc62f86",
+      "bytes": 6184
+    },
+    "frontend/src/metal-data.ts": {
+      "sha256": "55df774029281db4f3f6f5efc56cd8c5eb30876dc29a06637669becf457679e6",
+      "bytes": 1517
+    },
+    "frontend/src/metal-live.ts": {
+      "sha256": "270cfaace561442ea723c7868d569b006948704e41f29684274a193df979eeaf",
+      "bytes": 24355
+    },
+    "frontend/src/motion-resolution.ts": {
+      "sha256": "d3d2aad5534123077a7c08ac6b042e9fc3f17d8115e62b25991e2ccfce78f8ec",
+      "bytes": 741
+    },
+    "frontend/src/music-app.ts": {
+      "sha256": "27441176924a60dd1e4554a907063607a29383feefae639a61d1d2d619fe5ec2",
+      "bytes": 82272
+    },
+    "frontend/src/performance-probe.ts": {
+      "sha256": "4c813c6a9ee6bd0c14e0bfaec4aaea1f7c33b06adf1fb8a2dd2b246052b3e7e4",
+      "bytes": 8494
+    },
+    "frontend/src/scene.ts": {
+      "sha256": "b1a1522fc65101b15b16b9d3e48dae027a51e0f6512debc4846512b3d3540974",
+      "bytes": 87403
+    },
+    "frontend/src/transmission-prepass.ts": {
+      "sha256": "10e03f10c7e7a2008ee4809c4b176165d25a77e3ec556c7f5f1e9aea1fae6d18",
+      "bytes": 3188
+    },
+    "metal-lab/Cargo.lock": {
+      "sha256": "059a463808a1da85cd7df02845f3db64b7e2e036eb4748074db3f5be1aeb1a55",
+      "bytes": 42091
+    },
+    "metal-lab/Cargo.toml": {
+      "sha256": "b05be69979a4e9e1a76f5fce5cbc67c584c61147161507882369242ffa32c477",
+      "bytes": 564
+    },
+    "metal-lab/NOTICE.md": {
+      "sha256": "adddef8c78ced3a8f91bd79b30026a576fdcb821fe1ca47bcfc14ba4cffb1b1b",
+      "bytes": 412
+    },
+    "metal-lab/README.md": {
+      "sha256": "551e1743b60ffd7731a73aaa6335cf63909b41162a242f47ae069ac18d3d058a",
+      "bytes": 4075
+    },
+    "metal-lab/THREE-LICENSE.txt": {
+      "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc",
+      "bytes": 1081
+    },
+    "metal-lab/compile-frame.py": {
+      "sha256": "e05f27972260baf7ba99ce389975c04d50916603af7b90e0eb065fcded885372",
+      "bytes": 4667
+    },
+    "metal-lab/src/bin/compile-frame.rs": {
+      "sha256": "aa696c2d46d40193113637f6b0f96316caec107bdf80ede49c6ee9ff3fff971b",
+      "bytes": 370
+    },
+    "metal-lab/src/bin/frame.rs": {
+      "sha256": "1eb8262cdba0670631bc9c8fdf26ce1bf0222d09af459090ad4a782f7c31afbd",
+      "bytes": 116
+    },
+    "metal-lab/src/frame_renderer.rs": {
+      "sha256": "da406efd8ab6978c7cbb7c107c9ec07048a0a01e9bf97ad3f729f36952d7e4d0",
+      "bytes": 56864
+    },
+    "metal-lab/src/frame_window.rs": {
+      "sha256": "260d8050feb943724db1821cf721a8d98644e3d82bf208b590b8650d2edba28c",
+      "bytes": 5972
+    },
+    "metal-lab/src/lab.metal": {
+      "sha256": "f8e74e901829adfc0e1ce523f8f8f1b4c39ac4147b696e6d9bc37ad05615f5a4",
+      "bytes": 6507
+    },
+    "metal-lab/src/lib.rs": {
+      "sha256": "10ff06f8244239eff250185c92d6a1c02e409646521bbebe07af9b8a9de756d3",
+      "bytes": 51
+    },
+    "metal-lab/src/main.rs": {
+      "sha256": "88db5c27d13b103a14ca9bf3668b98eece048e31db81540692e0b79d2bbe8a77",
+      "bytes": 10582
+    },
+    "metal-lab/src/shader_translate.rs": {
+      "sha256": "5a83ecf2c67c4f302d10072e484d71d4a347777ec0dab5b1f58e535cbff3d7ce",
+      "bytes": 7420
+    },
+    "metal-lab/src/visibility.rs": {
+      "sha256": "7a907143bb613796e77eda555f0725b178ede1fcbfce815f998b196888957f94",
+      "bytes": 13513
+    },
+    "scripts/build-metal.py": {
+      "sha256": "da58dfdfa159a2a8ce838d4962ae6f1ce1d9826c8edc6b7cc8f947905b0b7d42",
+      "bytes": 5555
+    },
+    "src-tauri/src/metal_bridge.rs": {
+      "sha256": "48673043092aba100350ccbe9b6aff50075d1076bdc823dca33e0dd1d11fa792",
+      "bytes": 10134
+    }
+  },
+  "intentionalPostMigrationChanges": {
+    "frontend/src/motion-resolution.ts": {
+      "reason": "Q5 regression: ambient idle motion must not re-arm the reduced resolution tier.",
+      "sha256": "cb53e08124b75e1bf83918080ef80d9d7667030002d84d56e39bb4879e0a00fa"
+    },
+    "frontend/src/scene.ts": {
+      "reason": "Pass existing scene idle state into the resolution policy; do not change scene animation.",
+      "sha256": "afdfa2725458fe2b147655894bc0cc652a97928efeb437e60c4834c2af546466"
+    },
+    "frontend/scripts/check-motion-resolution.mjs": {
+      "reason": "Regression for continuous ambient motion at 30/60 Hz, followed by renewed interaction and settling.",
+      "sha256": "5ffe009564e35a4fd180d394980932c3dc975e26a58f8276f055332f33c9afcd"
+    }
+  },
+  "mainIntegration": {
+    "commit": "7d1b9304aa4bbe4bc09fccfd5d3fa7c46d5de50d",
+    "files": {
+      "frontend/src/music-app.ts": {
+        "reason": "Preserve main QQ panel dispose lifecycle hooks alongside rendering settings.",
+        "sha256": "55d486d490a83721d9d2c404d560eed62856f9c83165795e2a53c657782aae71"
+      }
+    }
+  }
+}
