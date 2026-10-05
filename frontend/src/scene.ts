@@ -1754,7 +1754,7 @@ export class ArchiveScene {
     this.covers?.flushUploads(this.renderer);
     const oldScale=this.motionResolution.scale;
     this.motionResolution.update(time,this.interactionPose().concat(this.rotation),
-      !this.reduced && !this.nativeMetal.preparing && !this.nativeMetal.stats.active,this.fullResolutionPixels);
+      !this.reduced && !this.nativeMetal.preparing && !this.nativeMetal.stats.active,this.fullResolutionPixels,idle);
     if (this.motionResolution.scale!==oldScale) this.resize();
     this.renderCurrentFrame();
     if (this.pendingHover) {

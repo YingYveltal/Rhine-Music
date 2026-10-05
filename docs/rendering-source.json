@@ -132,5 +132,19 @@
       "sha256": "48673043092aba100350ccbe9b6aff50075d1076bdc823dca33e0dd1d11fa792",
       "bytes": 10134
     }
+  },
+  "intentionalPostMigrationChanges": {
+    "frontend/src/motion-resolution.ts": {
+      "reason": "Q5 regression: ambient idle motion must not re-arm the reduced resolution tier.",
+      "sha256": "cb53e08124b75e1bf83918080ef80d9d7667030002d84d56e39bb4879e0a00fa"
+    },
+    "frontend/src/scene.ts": {
+      "reason": "Pass existing scene idle state into the resolution policy; do not change scene animation.",
+      "sha256": "afdfa2725458fe2b147655894bc0cc652a97928efeb437e60c4834c2af546466"
+    },
+    "frontend/scripts/check-motion-resolution.mjs": {
+      "reason": "Regression for continuous ambient motion at 30/60 Hz, followed by renewed interaction and settling.",
+      "sha256": "5ffe009564e35a4fd180d394980932c3dc975e26a58f8276f055332f33c9afcd"
+    }
   }
 }
