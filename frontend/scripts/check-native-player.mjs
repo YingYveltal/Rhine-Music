@@ -129,20 +129,31 @@ test('A to B to A requires the newest command confirmation, not a matching ID', 
   selected(player, 2, 'idle');
 });
 
-test('obsolete command failure cannot poison a newer selection; latest failure can retry', async t => {
+test('failed commands release only their own pending intent, reconcile playback, and allow explicit retry', async t => {
   const env = await fixture(t), { player, commands } = env;
   const b = player.next(); await settle();
   const c = player.next();
   commands[1].reject(new Error('obsolete B command')); await b; await settle();
   selected(player, 2);
+  await env.poll(snapshot());
+  selected(player, 2); // B's failure must not release C's pending confirmation.
+  const errors = [];
+  player.subscribe(state => { if (state.error) errors.push(state.error); });
   commands[2].reject(new Error('C command failed')); await c;
   assert.equal(player.state.transport, 'error');
   assert.equal(player.state.playing, false);
   assert.equal(player.state.loading, false);
   assert.match(player.state.error, /C command failed/);
-  await env.poll(snapshot());
-  assert.equal(player.state.transport, 'error', 'an unapplied old state must not erase the latest failure');
-  const retry = player.toggle(); await settle();
+  assert.ok(errors.some(error => error.includes('C command failed')), 'emit the failure for the existing notification subscriber');
+  // A rejected command will never be applied. Reconcile actual A playback
+  // instead of indefinitely presenting C as an error while A remains audible.
+  for (const elapsed of [25, 26, 28]) {
+    await env.poll(snapshot(0, 1, { elapsed }));
+    selected(player, 0, 'playing', elapsed);
+  }
+  await env.poll(snapshot(1, 1, { elapsed: 0 }));
+  selected(player, 1, 'playing'); // Backend automatic progression stays live.
+  const retry = player.play('C'); await settle();
   selected(player, 2);
   assert.equal(commands[3].id, 'C');
   commands[3].resolve(2); await retry;

@@ -153,6 +153,9 @@ export class NativeMusicPlayer {
       })
       .catch((error) => {
         if (generation !== this.generation || this.disposed) return;
+        // Rejected commands will never be acknowledged. Resume actual playback
+        // snapshots, without releasing a newer command's pending confirmation.
+        if (pending && this.pending === pending) this.pending = null;
         this.value.error = String(error);
         this.value.transport = "error";
         this.value.playing = false;
