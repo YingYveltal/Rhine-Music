@@ -5,30 +5,33 @@ use serde::{Deserialize,Serialize};
 use serde_json::{json,Value};
 use sha2::{Digest,Sha256};
 use std::{collections::{HashMap,HashSet},io::{Read,Write},path::{Path,PathBuf},sync::{Arc,Mutex,atomic::{AtomicU64,Ordering}},time::Duration};
+use crate::qq_session::{Connection, Credentials, Keychain};
 
 #[derive(Clone,Default,Serialize,Deserialize)]
 struct Song {mid:String,kind:u64}
 #[derive(Clone,Default,Serialize,Deserialize)]
 struct Saved {albums:Vec<Album>,songs:HashMap<String,Song>,updated:String,enabled:bool}
 pub struct Qq {
-    web:Mutex<WebClient>, key:Mutex<String>, saved:Mutex<Saved>, job:Mutex<Value>,
-    root:PathBuf, generation:AtomicU64, remembered:std::sync::atomic::AtomicBool,
+    connection:Connection, saved:Mutex<Saved>, job:Mutex<Value>, root:PathBuf,
 }
 impl Qq {
     pub fn new(dir:&Path)->Result<Arc<Self>> {
         let root=dir.join("qq");std::fs::create_dir_all(root.join("audio"))?;std::fs::create_dir_all(root.join("covers"))?;
-        let remembered=dir.join("qq/remember-connection").is_file();
-        let stored=if remembered {security_framework::passwords::generic_password(security_framework::passwords::PasswordOptions::new_generic_password("com.rhine.music.qq", "connection")).ok().and_then(|v|serde_json::from_slice::<Value>(&v).ok())}else{None};
-        let session=std::env::var("RHINE_QQ_SESSION").ok().and_then(|v|serde_json::from_str::<Value>(&v).ok()).or_else(||stored.as_ref().map(|v|v["session"].clone()));
-        let key=std::env::var("QQMUSIC_API_KEY").ok().or_else(||stored.as_ref().and_then(|v|v["key"].as_str().map(str::to_owned))).unwrap_or_default();
-        let saved=std::fs::read(root.join("library.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or_default();
-        let this=Arc::new(Self{web:Mutex::new(WebClient::new(session.as_ref())?),key:Mutex::new(key),saved:Mutex::new(saved),job:Mutex::new(json!({"running":false})),root,generation:AtomicU64::new(0),remembered:std::sync::atomic::AtomicBool::new(remembered)});
+        let session=std::env::var("RHINE_QQ_SESSION").ok();
+        let key=std::env::var("QQMUSIC_API_KEY").ok();
         std::env::remove_var("RHINE_QQ_SESSION");std::env::remove_var("QQMUSIC_API_KEY");
+        let bootstrap=if session.is_some()||key.is_some(){Some(Credentials{
+            session:session.map(|value|serde_json::from_str(&value).map_err(|_|anyhow::anyhow!("传入的 QQ 连接格式无效"))).transpose()?,
+            key:key.unwrap_or_default(),
+        })}else{None};
+        let connection=Connection::open(&root,Box::new(Keychain),bootstrap)?;
+        let saved=std::fs::read(root.join("library.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let this=Arc::new(Self{connection,saved:Mutex::new(saved),job:Mutex::new(json!({"running":false})),root});
         Ok(this)
     }
     pub fn status(&self)->Value {
-        let s=self.saved.lock().unwrap();let job=self.job.lock().unwrap().clone();
-        json!({"remembered":self.remembered.load(Ordering::SeqCst),"connected":self.web.lock().unwrap().authenticated(),"officialConfigured":!self.key.lock().unwrap().is_empty(),"enabled":s.enabled,"playlistCount":s.albums.len(),"trackCount":s.albums.iter().map(|a|a.tracks.len()).sum::<usize>(),"updatedAt":s.updated,"job":job})
+        let mut status=self.connection.status();let job=self.job.lock().unwrap().clone();let saved=self.saved.lock().unwrap();
+        status.as_object_mut().unwrap().extend(json!({"enabled":saved.enabled,"playlistCount":saved.albums.len(),"trackCount":saved.albums.iter().map(|album|album.tracks.len()).sum::<usize>(),"updatedAt":saved.updated,"job":job}).as_object().unwrap().clone());status
     }
     pub fn albums(&self)->Vec<Album>{let s=self.saved.lock().unwrap();if s.enabled{s.albums.clone()}else{vec![]}}
     pub fn find_track(&self,id:&str)->Option<Track>{self.saved.lock().unwrap().albums.iter().flat_map(|a|&a.tracks).find(|t|t.id==id).cloned()}
@@ -36,16 +39,31 @@ impl Qq {
     pub fn request(self:&Arc<Self>,operation:&str,body:Value)->Result<Value>{
         match operation {
             "status"=>Ok(self.status()),
-            "qr"=>{if self.job.lock().unwrap()["running"]==true {bail!("正在同步曲库，请完成后重新登录")};let generation=self.generation.fetch_add(1,Ordering::SeqCst)+1;let mut web=self.web.lock().unwrap().clone();let image=web.qr()?;if self.generation.load(Ordering::SeqCst)!=generation{bail!("登录请求已取消")};*self.web.lock().unwrap()=web;Ok(json!({"image":image}))},
-            "poll"=>{let generation=self.generation.load(Ordering::SeqCst);let mut web=self.web.lock().unwrap().clone();let result=web.poll()?;if self.generation.load(Ordering::SeqCst)!=generation{bail!("登录请求已取消")};*self.web.lock().unwrap()=web;Ok(result)},
-            "key"=>{let key=body["key"].as_str().unwrap_or("").trim();if !key.is_empty(){OfficialClient::new(key)?.search("晴天",0)?;}*self.key.lock().unwrap()=key.into();Ok(self.status())},
-            "remember"=>{let value=json!({"session":self.web.lock().unwrap().export_session(),"key":self.key.lock().unwrap().clone()});security_framework::passwords::set_generic_password("com.rhine.music.qq","connection",&serde_json::to_vec(&value)?).map_err(|_|anyhow::anyhow!("无法保存钥匙串，请检查 macOS 的授权提示"))?;std::fs::write(self.root.join("remember-connection"),b"enabled")?;self.remembered.store(true,Ordering::SeqCst);Ok(self.status())},
+            "login_start"=>{if self.job.lock().unwrap()["running"]==true{bail!("正在同步曲库，请完成后重新登录")};Ok(json!({"attemptId":self.connection.begin_login()}))},
+            "cancel_login"=>{self.connection.cancel_login(body["attemptId"].as_u64().context("登录请求编号缺失")?);Ok(self.status())},
+            "qr"|"poll"=>{
+                let attempt=body["attemptId"].as_u64().context("登录请求编号缺失")?;
+                let result=(||->Result<Value>{
+                    self.connection.check_attempt(attempt)?;
+                    if operation=="qr"{
+                        let mut web=WebClient::new(None)?;let image=web.qr()?;
+                        self.connection.accept_qr(attempt,web)?;Ok(json!({"image":image}))
+                    }else{
+                        let mut web=self.connection.polling_copy(attempt)?;let result=web.poll()?;
+                        self.connection.accept_poll(attempt,web,&result,||{*self.job.lock().unwrap()=json!({"running":false});})?;Ok(result)
+                    }
+                })();
+                if result.is_err(){self.connection.cancel_login(attempt);}result
+            },
+            "validate"=>{if let Some((version,web))=self.connection.begin_validation()?{let result=web.directory().map(|_|());self.connection.finish_validation(version,web,result)?;}Ok(self.status())},
+            "key"=>{let (version,_,_)=self.connection.snapshot();let key=body["key"].as_str().unwrap_or("").trim();if !key.is_empty(){OfficialClient::new(key)?.search("晴天",0)?;}self.connection.set_key(version,key.into())?;Ok(self.status())},
+            "remember"=>{self.connection.remember()?;Ok(self.status())},
             "local"=>{self.import_local()?;Ok(self.status())},
             "sync"=>{self.start_sync()?;Ok(self.status())},
             "enable"=>{let mut s=self.saved.lock().unwrap();s.enabled=body["enabled"].as_bool().unwrap_or(true);atomic_json(&self.root.join("library.json"),&s.clone())?;drop(s);Ok(self.status())},
-            "logout"=>{if self.remembered.load(Ordering::SeqCst){security_framework::passwords::delete_generic_password("com.rhine.music.qq","connection").map_err(|_|anyhow::anyhow!("无法移除钥匙串，请检查系统授权"))?;}let _=std::fs::remove_file(self.root.join("remember-connection"));self.remembered.store(false,Ordering::SeqCst);*self.job.lock().unwrap()=json!({"running":false});self.generation.fetch_add(1,Ordering::SeqCst);*self.web.lock().unwrap()=WebClient::new(None)?;self.key.lock().unwrap().clear();let mut s=self.saved.lock().unwrap();s.enabled=false;atomic_json(&self.root.join("library.json"),&s.clone())?;drop(s);Ok(self.status())},
+            "logout"=>{self.connection.disconnect(||{*self.job.lock().unwrap()=json!({"running":false});let mut saved=self.saved.lock().unwrap();saved.enabled=false;atomic_json(&self.root.join("library.json"),&*saved)})?;Ok(self.status())},
             "search"|"daily"=>{
-                let key=self.key.lock().unwrap().clone();let web=self.web.lock().unwrap().clone();
+                let (version,web,key)=self.connection.snapshot();
                 let tracks=if operation=="daily"{if key.is_empty(){bail!("每日推荐需要 QQ 音乐官方 API Key，可在连接设置中填写")};OfficialClient::new(&key)?.daily()?}else if !key.is_empty(){OfficialClient::new(&key)?.search(body["query"].as_str().unwrap_or(""),0)?.0}else{vec![]};
                 let mut raw=if key.is_empty(){web.search(body["query"].as_str().unwrap_or(""))?}else{tracks.iter().filter_map(|t|t.mid.as_ref().map(|mid|json!({"mid":mid,"name":t.title,"singer":t.artists.iter().map(|a|json!({"name":a})).collect::<Vec<_>>(),"type":0}))).collect()};
                 // Four bounded metadata requests at a time; rendering and playback never wait on this worker.
@@ -55,9 +73,9 @@ impl Qq {
                 });for (track,detail) in chunk.iter_mut().zip(details){if let Some(detail)=detail{*track=detail;}}}}
                 let id=if operation=="daily"{"qq-daily"}else{"qq-search"};
                 let cover=self.cover(id,"",raw.first());
-                let mut s=self.saved.lock().unwrap();let (album,songs)=make_album(id,if operation=="daily"{"每日推荐"}else{"QQ 搜索结果"},"qq-discover",&raw,cover);
-                s.songs.extend(songs);s.albums.retain(|a|a.id!=id);s.albums.push(album.clone());s.enabled=true;drop(s);
-                Ok(json!({"albumId":id,"count":album.tracks.len()}))
+                self.connection.if_current(version,||{let mut saved=self.saved.lock().unwrap();let (album,songs)=make_album(id,if operation=="daily"{"每日推荐"}else{"QQ 搜索结果"},"qq-discover",&raw,cover);
+                saved.songs.extend(songs);saved.albums.retain(|album|album.id!=id);saved.albums.push(album.clone());saved.enabled=true;
+                Ok(json!({"albumId":id,"count":album.tracks.len()}))})
             },
             "client"=>{Ok(json!({"url":"https://y.qq.com/"}))},
             _=>bail!("未知 QQ 音乐操作"),
@@ -65,7 +83,7 @@ impl Qq {
     }
     fn import_local(&self)->Result<()> {
         if self.job.lock().unwrap()["running"]==true {bail!("正在同步，请稍后导入本地快照")}
-        let uin=self.web.lock().unwrap().uin().parse::<i64>().ok();
+        let (version,web)=self.connection.account_snapshot();let uin=web.uin().parse::<i64>().ok();
         let playlists=rhine_qq_connector::local::read_library(&rhine_qq_connector::local::default_path()?,uin)?;
         if playlists.is_empty(){bail!("本机 QQ 音乐没有已缓存的歌单，请先在 QQ 客户端打开歌单")}
         let mut saved=Saved{enabled:true,updated:timestamp(),..Default::default()};
@@ -75,17 +93,15 @@ impl Qq {
             album.description=Some(format!("来自本机 QQ 音乐缓存，尚未验证云端是否最新。已缓存 {}/{} 个条目。",p.tracks.len(),p.advertised_count));
             saved.albums.push(album);saved.songs.extend(songs);
         }
-        atomic_json(&self.root.join("library.json"),&saved)?;*self.saved.lock().unwrap()=saved;Ok(())
+        self.connection.if_account_current(version,||{atomic_json(&self.root.join("library.json"),&saved)?;*self.saved.lock().unwrap()=saved;Ok(())})
     }
     pub fn start_sync(self:&Arc<Self>)->Result<()> {
-        let mut job=self.job.lock().unwrap();if job["running"]==true{return Ok(())}
-        let web=self.web.lock().unwrap().clone();if !web.authenticated(){bail!("请先连接 QQ 音乐账户")}
-        *job=json!({"running":true,"completed":0,"total":0,"message":"正在读取歌单目录"});drop(job);
-        let generation=self.generation.load(Ordering::SeqCst);let this=self.clone();
+        let (generation,web)=self.connection.account_snapshot();if !web.authenticated(){bail!("请先连接 QQ 音乐账户")}
+        let started=self.connection.if_account_current(generation,||{let mut job=self.job.lock().unwrap();if job["running"]==true{return Ok(false)}*job=json!({"running":true,"completed":0,"total":0,"message":"正在读取歌单目录"});Ok(true)})?;
+        if !started{return Ok(())};let this=self.clone();
         std::thread::spawn(move||{
             let outcome=this.sync_inner(&web,generation);
-            if this.generation.load(Ordering::SeqCst)!=generation{return}
-            *this.job.lock().unwrap()=match outcome {Ok(n)=>json!({"running":false,"completed":n,"total":n,"message":"曲库同步完成"}),Err(e)=>json!({"running":false,"error":e.to_string(),"message":"同步未完成，原曲库保留"})};
+            let _=this.connection.if_account_current(generation,||{*this.job.lock().unwrap()=match outcome {Ok(n)=>json!({"running":false,"completed":n,"total":n,"message":"曲库同步完成"}),Err(e)=>json!({"running":false,"error":e.to_string(),"message":"同步未完成，原曲库保留"})};Ok(())});
         });Ok(())
     }
     fn sync_inner(&self,web:&WebClient,generation:u64)->Result<usize>{
@@ -100,22 +116,19 @@ impl Qq {
         }
         let total=entries.len()+albums.len();let mut next=Saved{enabled:true,updated:timestamp(),..Default::default()};
         for (i,(id,name,liked,cover)) in entries.iter().enumerate(){
-            if self.generation.load(Ordering::SeqCst)!=generation {bail!("同步已取消")}
-            *self.job.lock().unwrap()=json!({"running":true,"completed":i,"total":total,"message":format!("正在同步 {name}")});
+            self.connection.if_account_current(generation,||{*self.job.lock().unwrap()=json!({"running":true,"completed":i,"total":total,"message":format!("正在同步 {name}")});Ok(())})?;
             let result=web.playlist(if *liked{0}else{id.parse()?},*liked)?;let tracks=result["tracks"].as_array().context("歌曲列表缺失")?;
             let a_id=format!("qq-playlist-{id}");let c=self.cover(&a_id,if cover.is_empty(){result["cover"].as_str().unwrap_or("")}else{cover},tracks.first());
             let (album,songs)=make_album(&a_id,name,"qq-playlists",tracks,c);next.albums.push(album);next.songs.extend(songs);
             std::thread::sleep(Duration::from_millis(180));
         }
         for (i,a) in albums.iter().enumerate(){
-            if self.generation.load(Ordering::SeqCst)!=generation {bail!("同步已取消")}
             let mid=a["albummid"].as_str().context("专辑编号缺失")?;let name=a["albumname"].as_str().unwrap_or("QQ 专辑");
-            *self.job.lock().unwrap()=json!({"running":true,"completed":entries.len()+i,"total":total,"message":format!("正在同步专辑 {name}")});
+            self.connection.if_account_current(generation,||{*self.job.lock().unwrap()=json!({"running":true,"completed":entries.len()+i,"total":total,"message":format!("正在同步 {name}")});Ok(())})?;
             let tracks=web.album(mid)?;let id=format!("qq-album-{mid}");let c=self.cover(&id,a["pic"].as_str().unwrap_or(""),tracks.first());
             let (album,songs)=make_album(&id,name,"qq-albums",&tracks,c);next.albums.push(album);next.songs.extend(songs);
         }
-        if self.generation.load(Ordering::SeqCst)!=generation{bail!("同步已取消")}
-        atomic_json(&self.root.join("library.json"),&next)?;*self.saved.lock().unwrap()=next;Ok(total)
+        self.connection.if_account_current(generation,||{atomic_json(&self.root.join("library.json"),&next)?;*self.saved.lock().unwrap()=next;Ok(total)})
     }
     fn cover(&self,id:&str,url:&str,first:Option<&Value>)->Option<Cover>{
         let cover_id=if id=="qq-search"||id=="qq-daily"{format!("{id}-{:x}",Sha256::digest(first.map(Value::to_string).unwrap_or_default().as_bytes()))}else{id.to_owned()};
@@ -138,7 +151,7 @@ impl Qq {
         let filename=format!("{:x}.m4a",Sha256::digest(format!("{}:{}",song.mid,song.kind).as_bytes()));
         let path=self.root.join("audio").join(&filename);
         let mut ready=track.clone();ready.path=path.clone();ready.format="AAC".into();ready.codec=Some("AAC".into());
-        let web=self.web.lock().unwrap().clone();
+        let (_,web,_)=self.connection.snapshot();
         if path.is_file()&&path.metadata()?.len()>1000{return Ok(ready)}
         let url=web.audio_url(&song.mid,song.kind)?;
         if token.load(Ordering::SeqCst)!=expected{bail!("播放请求已取消")}
@@ -175,6 +188,46 @@ fn make_album(id:&str,name:&str,genre:&str,raw:&[Value],cover:Option<Cover>)->(A
 
 #[cfg(test)] mod tests {
     use super::*;
+    struct NoKeychain;
+    impl crate::qq_session::CredentialStore for NoKeychain {
+        fn load(&mut self)->Result<Option<Credentials>> { panic!("must not load credentials") }
+        fn save(&mut self,_:&Credentials)->Result<()> { panic!("must not save credentials") }
+        fn delete(&mut self)->Result<()> { panic!("nothing was saved") }
+    }
+    #[test] fn validate_returns_disconnected_when_cookies_expired_before_the_request() {
+        let dir=tempfile::tempdir().unwrap();
+        let web=WebClient::new(Some(&json!({"cookies":[
+            {"domain":".qq.com","name":"uin","value":"10001"},
+            {"domain":".qq.com","name":"qm_keyst","value":"synthetic"}
+        ]}))).unwrap();
+        assert!(web.authenticated());let mut session=web.export_session();
+        for cookie in session["cookieStore"].as_array_mut().unwrap(){
+            cookie["expires"]=json!({"AtUtc":"2000-01-01T00:00:00Z"});
+        }
+        let connection=Connection::open(dir.path(),Box::new(NoKeychain),Some(Credentials{session:Some(session),key:String::new()})).unwrap();
+        let qq=Arc::new(Qq{connection,saved:Mutex::new(Saved::default()),job:Mutex::new(json!({"running":false})),root:dir.path().to_owned()});
+        let result=qq.request("validate",json!({})).unwrap();
+        assert_eq!(result["connected"],false);
+        assert_ne!(result["connectionState"],"connected");
+        assert!(result["connectionNotice"].as_str().unwrap().contains("过期"));
+    }
+    #[test] fn cancel_preserves_library_and_logout_rejects_late_library_commits() {
+        let dir=tempfile::tempdir().unwrap();
+        let connection=Connection::open(dir.path(),Box::new(NoKeychain),None).unwrap();
+        let (album,songs)=make_album("qq-synthetic","Synthetic","qq-playlists",&[json!({"mid":"SYNTHETIC","title":"Fixture"})],None);
+        let qq=Arc::new(Qq{connection,saved:Mutex::new(Saved{albums:vec![album],songs,enabled:true,..Default::default()}),job:Mutex::new(json!({"running":false})),root:dir.path().to_owned()});
+        let attempt=qq.request("login_start",json!({})).unwrap()["attemptId"].as_u64().unwrap();
+        qq.request("cancel_login",json!({"attemptId":attempt})).unwrap();
+        assert_eq!(qq.albums().len(),1);
+        let account_version=qq.connection.account_snapshot().0;let version=qq.connection.snapshot().0;
+        *qq.job.lock().unwrap()=json!({"running":true});
+        qq.request("logout",json!({})).unwrap();
+        assert!(qq.albums().is_empty());assert_eq!(qq.status()["job"]["running"],false);
+        assert!(qq.connection.if_current(version,||{qq.saved.lock().unwrap().enabled=true;Ok(())}).is_err());
+        assert!(qq.connection.if_account_current(account_version,||{qq.saved.lock().unwrap().enabled=true;Ok(())}).is_err());
+        let saved:Saved=serde_json::from_slice(&std::fs::read(dir.path().join("library.json")).unwrap()).unwrap();
+        assert!(!saved.enabled);assert_eq!(saved.albums.len(),1);assert_eq!(saved.songs.len(),1);
+    }
     #[test] fn manifest_preserves_order_duplicates_and_unavailable_entries() {
         let raw=vec![json!({"id":1,"mid":"A","title":"One"}),json!({"id":2,"title":"Unavailable"}),json!({"id":1,"mid":"A","title":"One"})];
         let (album,songs)=make_album("qq-test","Test","qq-playlists",&raw,None);
@@ -187,7 +240,7 @@ fn make_album(id:&str,name:&str,genre:&str,raw:&[Value],cover:Option<Cover>)->(A
     fn live_qq_library_and_audio() {
         use crate::audio::{Audio,Playback};use rodio::Source;use std::time::Instant;
         let dir=std::env::var("RHINE_QQ_TEST_DATA").expect("explicit test directory required");
-        let qq=Qq::new(Path::new(&dir)).unwrap();assert_eq!(qq.status()["connected"],true);
+        let qq=Qq::new(Path::new(&dir)).unwrap();qq.request("validate",json!({})).unwrap();assert_eq!(qq.status()["connected"],true);
         qq.start_sync().unwrap();let started=Instant::now();
         while qq.status()["job"]["running"]==true {assert!(started.elapsed().as_secs()<240,"sync timeout");std::thread::sleep(Duration::from_millis(200));}
         let status=qq.status();assert!(status["job"]["error"].is_null(),"{}",status["job"]["error"]);
