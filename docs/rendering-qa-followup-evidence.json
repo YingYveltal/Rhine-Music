@@ -428,6 +428,168 @@
       "path": ".local/default-qq-qa-fix/evidence/fixed-stress-end.txt",
       "sha256": "0a660ad430f765653b8ec3f567160d8c0209076f09190010a96b465a52955525",
       "bytes": 2649
+    },
+    {
+      "path": ".local/default-qq-qa-fix/finish-launch.json",
+      "sha256": "eb9558d310897bee623630151ac9c209290af3e51abeb5542986e14589380813",
+      "bytes": 361
+    },
+    {
+      "path": ".local/default-qq-qa-fix/runtime-finish.log",
+      "sha256": "7e501e309aa3971905979278c0494083c16bab804cd1deecc8e8113cb4e28f60",
+      "bytes": 52
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/pick-before.txt",
+      "sha256": "a9cbaed4746cd0d48215c118b5fac342e8b275844028403aa0a890435d9dd142",
+      "bytes": 3089
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/pick-before.png",
+      "sha256": "cb62cb972fa4bd95f92f611ed07c91c7da704278a21240d3f75929fbe3e5a95c",
+      "bytes": 420188
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/pick-orange-after.txt",
+      "sha256": "b30f82fe50f12207b14e621aa9ab86d14c91c64ce963f52c689a38d49a4f516c",
+      "bytes": 3088
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/pick-orange-after.png",
+      "sha256": "cac497ae86052023ff69b79ec3f7b6b88bf4cd94a301246907a697b7a3d122d8",
+      "bytes": 422107
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/two-columns-ready.txt",
+      "sha256": "a249643f90177bad1b196dcb5f4ced05871d4e761adeadfb493ed326c218b4aa",
+      "bytes": 2412
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/two-columns-ready.png",
+      "sha256": "d6fb18dceea336354299abe83daf19f998c2d4b0f721d37fab4a2dd1ab83253b",
+      "bytes": 426414
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-two-column-stress-end.txt",
+      "sha256": "5b6d794126a6cf13d02952a2562776d3a97d25f9ff09971184df7689945c4d2b",
+      "bytes": 2536
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-two-column-stress-end.png",
+      "sha256": "443cf3e1ee52cc21e33110b5f843459234473e422982952d59088d77479ed656",
+      "bytes": 469453
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-long-navigation-start.txt",
+      "sha256": "fd7d6fb8d61b44dd7aac540f7b1a0053669755a16ff35bb256d8cfd60e4ce229",
+      "bytes": 2916
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-long-navigation-start.png",
+      "sha256": "886f78279d75e17c69fd74cf09cb8e5ecc80d61bdb526f9fe23083838a11f065",
+      "bytes": 646821
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-long-navigation-end.txt",
+      "sha256": "c2288d8ed6943c90a2145e9f4c0d008978398448fcc5941f3b64f6acace3f5d4",
+      "bytes": 2863
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-long-navigation-end.png",
+      "sha256": "b27e01bbb238b8d0902d52a8832a938374a7ff98aab10b4bbfdc9a67aa5954b9",
+      "bytes": 643454
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-idle-end.txt",
+      "sha256": "1602f1156f657343b852015047acb31614fd64fa94d703f3960f0d79e9fdf239",
+      "bytes": 2916
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-idle-end.png",
+      "sha256": "b673253ca745dae8788aeaf0853ff51f9a08edc3b8ea36b84ee0b076a7bfc051",
+      "bytes": 649202
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/disable-during-motion-before.txt",
+      "sha256": "55fde4e521c6e979975e87164302e1450e589ad2c69268ace359e9e23ef9f25b",
+      "bytes": 4960
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/disable-during-motion-before.png",
+      "sha256": "e8c2eff1c354a4632a369c31593a244bd98f9ea8e042ed0bcf3ce1d73ecbd617",
+      "bytes": 462323
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/disable-during-motion-after.txt",
+      "sha256": "d886d53471889b2ab0b6197e9c177c33fd6dd28af6f859b0c345ed6f75992817",
+      "bytes": 5023
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/disable-during-motion-after.png",
+      "sha256": "25eac73d929feadb02b492ca3e829b9f0abfa392668d410b4fc113d83697b39b",
+      "bytes": 462580
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/disabled-motion-end.txt",
+      "sha256": "d886d53471889b2ab0b6197e9c177c33fd6dd28af6f859b0c345ed6f75992817",
+      "bytes": 5023
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/disabled-motion-end.png",
+      "sha256": "1410e6966d51e92fca295326c1be25df127dd5b763493c9dbe6db96f7d155eaa",
+      "bytes": 462506
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/restored-settings.txt",
+      "sha256": "54e3196bd4c9f9aeb30884e6929222de9ee7766472a2b588dc54c412d85bd40f",
+      "bytes": 4914
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/restored-settings.png",
+      "sha256": "c5dadee772c27702d0dc008b25af8e8e40c0b40b1d8f4106b240f5e8afa0cdee",
+      "bytes": 464493
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/observations.json",
+      "sha256": "a9a0fc415d461aeba16e6f47d88dd9c69a2d2ac177bdec888edc7e9229e56bd9",
+      "bytes": 1396
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/disable-timing.json",
+      "sha256": "e269a32a3ee1b7cd6afcfb845288c5f5d4a61de73d2fe14a5fdc0614ff5e9b86",
+      "bytes": 180
+    },
+    {
+      "path": ".local/default-qq-qa-fix/evidence-finish/fullscreen-long-navigation-keys.json",
+      "sha256": "da7e03163ed42d4629303180e4893db2056e0bb1447bf714d7589b3c02a05a3d",
+      "bytes": 672
+    },
+    {
+      "path": ".local/default-qq-qa/data-final/benchmarks/20261005-144956-optimized-archive-night.json",
+      "sha256": "b5ab7cc83225009b610c7a19ae47e254138273a7493b169a20e01b067813fdbd",
+      "bytes": 5014,
+      "status": "Excluded: display changed, valid=false, empty raw samples"
+    },
+    {
+      "path": ".local/default-qq-qa/data-final/benchmarks/20261005-145054-optimized-stress-night.json",
+      "sha256": "25fb6e73377d081efc16e5a8c2bab0370ef244adb2651074e3b22eb285f0803c",
+      "bytes": 217759
+    },
+    {
+      "path": ".local/default-qq-qa/data-final/benchmarks/20261005-145147-optimized-archive-night.json",
+      "sha256": "1ee94995eb28178aa485a3a2f7645c876f7e49c50d97132f614f49812624306e",
+      "bytes": 70012
+    },
+    {
+      "path": ".local/default-qq-qa/data-final/benchmarks/20261005-145235-optimized-archive-night.json",
+      "sha256": "0ad7b7fe1cddebccf65e39df7a115ab337948ff2786cc1158a834471d7377860",
+      "bytes": 62485
+    },
+    {
+      "path": ".local/default-qq-qa/data-final/benchmarks/20261005-145407-optimized-motion-night.json",
+      "sha256": "4c8ca70b9bd85936a5268ea85fcf866616cf1405a3213a5acc3e6c1ba0ec854b",
+      "bytes": 63921
     }
-  ]
+  ],
+  "finishScope": "Same fixed app; positive native card pick, actual two-column replay, long navigation tail, idle hold, disable during motion, preferences restored and process exited. Not performance acceptance."
 }
