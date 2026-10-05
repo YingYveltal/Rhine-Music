@@ -87,7 +87,7 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
             return;
         }
     };
-    let mut sink = match Sink::try_new(&handle) {
+    let sink = match Sink::try_new(&handle) {
         Ok(s) => s,
         Err(e) => {
             state.lock().unwrap().error = Some(e.to_string());
@@ -107,11 +107,25 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
             Err(e) => state.lock().unwrap().bgm_error = Some(e),
         }
     }
+    run_transport(rx, state, sink, bgm, resolver, || Sink::try_new(&handle));
+}
+
+// The device setup stays above; the same transport loop can use idle sinks in
+// tests without opening an output device or duplicating its transitions.
+fn run_transport(
+    rx: Receiver<Command>,
+    state: Arc<Mutex<Playback>>,
+    mut sink: Sink,
+    bgm: Option<Sink>,
+    resolver: Option<Resolver>,
+    mut new_sink: impl FnMut() -> Result<Sink, rodio::PlayError>,
+) {
     let mut volume = 0.72;
     let mut bgm_volume = 0.18;
     let mut bgm_enabled = true;
     let mut fade = true;
-    let mut loaded_id: Option<String> = None;
+    // Retain the resolved/decoded metadata for the source currently in the sink.
+    let mut loaded_track: Option<Track> = None;
     let mut queue = Vec::<Track>::new();
     let mut index = 0;
     let mut pending = None;
@@ -138,12 +152,18 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
                         unlocked = true;
                         queue = tracks;
                         index = i;
-                        let same = loaded_id.as_ref() == Some(&queue[i].id);
+                        let same = loaded_track.as_ref().is_some_and(|track| track.id == queue[i].id);
                         if same && !sink.empty() {
                             sink.play();
                             gain = 1.;
                             phase = 0;
-                            state.lock().unwrap().transport = "playing".into();
+                            pending = None;
+                            let mut s = state.lock().unwrap();
+                            s.track = loaded_track.clone();
+                            s.transport = "playing".into();
+                            s.playing = true;
+                            s.elapsed = sink.get_pos().as_secs_f64();
+                            s.error = None;
                         } else {
                             pending = Some(queue[i].clone());
                             fade_from = gain;
@@ -168,15 +188,17 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
                     epoch.fetch_add(1,Ordering::SeqCst);loading=None;
                     if pending.is_some() {
                         let selected = state.lock().unwrap().track.as_ref().map(|t| t.id.clone());
-                        if loaded_id != selected {
+                        if loaded_track.as_ref().map(|track| &track.id) != selected.as_ref() {
                             sink.stop();
-                            loaded_id = None;
+                            loaded_track = None;
                         }
                     }
                     pending = None;
                     phase = 0;
                     gain = 1.0;
-                    if !sink.empty() {
+                    // stop() drains on the output callback. A discarded source
+                    // must not be resumed while those final samples are pending.
+                    if loaded_track.is_some() && !sink.empty() {
                         if sink.is_paused() {
                             sink.play();
                             state.lock().unwrap().transport = "playing".into();
@@ -191,6 +213,7 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
                 Command::Stop => {
                     epoch.fetch_add(1,Ordering::SeqCst);loading=None;
                     sink.stop();
+                    loaded_track = None;
                     pending = None;
                     queue.clear();
                     phase = 0;
@@ -228,7 +251,7 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
                 let (sender,receiver)=crossbeam_channel::bounded(1);loading=Some(receiver);
                 let resolver=resolver.clone();let token=epoch.clone();let expected=token.load(Ordering::SeqCst);
                 {let mut s=state.lock().unwrap();s.track=Some(track.clone());s.transport="loading".into();s.elapsed=0.;s.playing=false;}
-                sink.stop();loaded_id=None;
+                sink.stop();loaded_track=None;
                 std::thread::spawn(move||{let result=resolver.context("QQ 音乐播放通道尚未连接").and_then(|r|r(&track,&token,expected));let _=sender.send(result);});
                 phase=4;
             }
@@ -247,7 +270,7 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
                     }
                     let source:Box<dyn Source<Item=i16>+Send>=if track.id.starts_with("qq-"){Box::new(crate::qq_audio::QqAudio::open(&track.path)?)}else{Box::new(Decoder::new(BufReader::new(File::open(&track.path)?))?)};
                     if let Some(duration)=source.total_duration(){if track.duration<=0.{track.duration=duration.as_secs_f64()}}
-                    let new = Sink::try_new(&handle)?;
+                    let new = new_sink()?;
                     new.set_volume(0.0);
                     new.append(source);
                     Ok(new)
@@ -256,7 +279,7 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
                     Ok(next) => {
                         sink.stop();
                         sink = next;
-                        loaded_id = Some(track.id.clone());
+                        loaded_track = Some(track.clone());
                         let mut s = state.lock().unwrap();
                         s.track = Some(track);
                         s.error = None;
@@ -268,6 +291,7 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
                     }
                     Err(e) => {
                         sink.stop();
+                        loaded_track = None;
                         phase = 0;
                         let mut s = state.lock().unwrap();
                         s.error = Some(format!("无法播放 {}：{e}", track.title));
@@ -400,3 +424,7 @@ mod tests {
         wait(&|s| s.transport == "idle" && !s.playing && s.elapsed == 0.);
     }
 }
+
+#[cfg(test)]
+#[path = "audio/transport_tests.rs"]
+mod transport_tests;
