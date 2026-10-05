@@ -262,16 +262,16 @@ fn make_album(id:&str,name:&str,genre:&str,raw:&[Value],cover:Option<Cover>)->(A
         assert_eq!(ready.len(),2,"need two account-playable songs");
         let assets=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../frontend/public");
         let resolver=qq.clone();let player=Audio::with_resolver(assets,Some(Arc::new(move|t,e,n|resolver.prepare(t,e,n))));
-        player.settings(0.,0.,0.,false,false);
+        player.settings(0.,0.,0.,false,false).unwrap();
         let wait=|condition:&dyn Fn(&Playback)->bool|{let start=Instant::now();loop{let s=player.snapshot();assert!(s.error.is_none(),"{:?}",s.error);if condition(&s){return s}assert!(start.elapsed().as_secs()<25,"transport timeout: {}",s.transport);std::thread::sleep(Duration::from_millis(20));}};
-        player.play(ready.clone(),0);wait(&|s|s.playing&&s.elapsed>0.15);
-        player.toggle();wait(&|s|s.transport=="paused");player.seek(45.);wait(&|s|s.elapsed>=44.);
-        player.toggle();wait(&|s|s.playing);
-        let began=Instant::now();for i in 0..20 {player.play(ready.clone(),i%2);std::thread::sleep(Duration::from_millis(15));}
+        player.play(ready.clone(),0).unwrap();wait(&|s|s.playing&&s.elapsed>0.15);
+        player.toggle().unwrap();wait(&|s|s.transport=="paused");player.seek(45.).unwrap();wait(&|s|s.elapsed>=44.);
+        player.toggle().unwrap();wait(&|s|s.playing);
+        let began=Instant::now();for i in 0..20 {player.play(ready.clone(),i%2).unwrap();std::thread::sleep(Duration::from_millis(15));}
         wait(&|s|s.playing&&s.track.as_ref().is_some_and(|t|t.id==ready[1].id));let rapid_ms=began.elapsed().as_millis();
-        player.play(ready.clone(),0);wait(&|s|s.playing&&s.track.as_ref().is_some_and(|t|t.id==ready[0].id));
-        player.seek(ready[0].duration-0.2);wait(&|s|s.playing&&s.track.as_ref().is_some_and(|t|t.id==ready[1].id));
-        player.stop();wait(&|s|s.transport=="idle"&&!s.playing);
+        player.play(ready.clone(),0).unwrap();wait(&|s|s.playing&&s.track.as_ref().is_some_and(|t|t.id==ready[0].id));
+        player.seek(ready[0].duration-0.2).unwrap();wait(&|s|s.playing&&s.track.as_ref().is_some_and(|t|t.id==ready[1].id));
+        player.stop().unwrap();wait(&|s|s.transport=="idle"&&!s.playing);
         let report=json!({"sync":status,"fullLengthAudioSamples":samples,"pauseSeekResume":true,"automaticNext":true,"rapidSwitchRequests":20,"rapidSwitchTotalMs":rapid_ms,"stop":true,"credentialsStored":false});
         atomic_json(&Path::new(&dir).join("live-qq-test.json"),&report).unwrap();
         println!("QQ live integration: full library, two full-length AAC decodes, pause/seek/resume, rapid switching, queue advance and stop passed.");
