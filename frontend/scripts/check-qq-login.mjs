@@ -14,7 +14,7 @@ function harness() {
   const login = createQqLogin(call, {
     image: image => events.push(['image', image]), message: text => events.push(['message', text]),
     connected: () => events.push(['connected']),
-  }, 1);
+  });
   return { calls, events, login };
 }
 
@@ -67,10 +67,14 @@ for (const outcome of ['expired', 'cancelled', 'failure']) {
   });
 }
 
-test('waiting schedules one poll and disposal clears the timer', async () => {
+test('waiting schedules one poll and disposal clears the timer', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const h = harness(); const starting = h.login.start(); h.calls[0].resolve({ attemptId: 10 }); await settle();
   h.calls[1].resolve({ image: 'synthetic' }); await starting;
-  h.calls[2].resolve({ message: 'waiting' }); await settle(); h.login.dispose();
-  await new Promise(resolve => setTimeout(resolve, 10));
-  assert.equal(h.calls.filter(c => c.operation === 'poll').length, 1);
+  h.calls[2].resolve({ message: 'waiting' }); await settle();
+  t.mock.timers.tick(2000); await settle();
+  assert.equal(h.calls.filter(c => c.operation === 'poll').length, 2);
+  h.calls[3].resolve({ message: 'confirming' }); await settle(); h.login.dispose();
+  t.mock.timers.tick(2000); await settle();
+  assert.equal(h.calls.filter(c => c.operation === 'poll').length, 2);
 });

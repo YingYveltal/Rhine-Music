@@ -188,6 +188,29 @@ fn make_album(id:&str,name:&str,genre:&str,raw:&[Value],cover:Option<Cover>)->(A
 
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn cancel_preserves_library_and_logout_rejects_late_library_commits() {
+        struct NoKeychain;
+        impl crate::qq_session::CredentialStore for NoKeychain {
+            fn load(&mut self)->Result<Option<Credentials>> { panic!("must not load credentials") }
+            fn save(&mut self,_:&Credentials)->Result<()> { panic!("must not save credentials") }
+            fn delete(&mut self)->Result<()> { panic!("nothing was saved") }
+        }
+        let dir=tempfile::tempdir().unwrap();
+        let connection=Connection::open(dir.path(),Box::new(NoKeychain),None).unwrap();
+        let (album,songs)=make_album("qq-synthetic","Synthetic","qq-playlists",&[json!({"mid":"SYNTHETIC","title":"Fixture"})],None);
+        let qq=Arc::new(Qq{connection,saved:Mutex::new(Saved{albums:vec![album],songs,enabled:true,..Default::default()}),job:Mutex::new(json!({"running":false})),root:dir.path().to_owned()});
+        let attempt=qq.request("login_start",json!({})).unwrap()["attemptId"].as_u64().unwrap();
+        qq.request("cancel_login",json!({"attemptId":attempt})).unwrap();
+        assert_eq!(qq.albums().len(),1);
+        let account_version=qq.connection.account_snapshot().0;let version=qq.connection.snapshot().0;
+        *qq.job.lock().unwrap()=json!({"running":true});
+        qq.request("logout",json!({})).unwrap();
+        assert!(qq.albums().is_empty());assert_eq!(qq.status()["job"]["running"],false);
+        assert!(qq.connection.if_current(version,||{qq.saved.lock().unwrap().enabled=true;Ok(())}).is_err());
+        assert!(qq.connection.if_account_current(account_version,||{qq.saved.lock().unwrap().enabled=true;Ok(())}).is_err());
+        let saved:Saved=serde_json::from_slice(&std::fs::read(dir.path().join("library.json")).unwrap()).unwrap();
+        assert!(!saved.enabled);assert_eq!(saved.albums.len(),1);assert_eq!(saved.songs.len(),1);
+    }
     #[test] fn manifest_preserves_order_duplicates_and_unavailable_entries() {
         let raw=vec![json!({"id":1,"mid":"A","title":"One"}),json!({"id":2,"title":"Unavailable"}),json!({"id":1,"mid":"A","title":"One"})];
         let (album,songs)=make_album("qq-test","Test","qq-playlists",&raw,None);
