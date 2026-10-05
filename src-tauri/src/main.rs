@@ -1,3 +1,5 @@
+#[cfg(feature = "preview")]
+mod preview;
 mod audio;
 mod library;
 mod online;
@@ -502,8 +504,10 @@ async fn open_link(app: tauri::AppHandle, href: String) -> std::result::Result<(
     if let Some(window) = app.get_webview_window(&label) {
         return window.set_focus().map_err(|e| e.to_string());
     }
-    tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::External(url))
-        .title("Rhine Music · 参考资料")
+    let builder = tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::External(url));
+    #[cfg(feature = "preview")]
+    let builder = builder.data_store_identifier(preview::identity().1);
+    builder.title("Rhine Music · 参考资料")
         .inner_size(1100.0, 760.0)
         .build()
         .map(|_| ())
@@ -521,6 +525,9 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            #[cfg(feature = "preview")]
+            let data = preview::setup(app)?;
+            #[cfg(not(feature = "preview"))]
             let data = std::env::var_os("MUSIC_NATIVE_DATA_DIR")
                 .map(PathBuf::from)
                 .unwrap_or(app.path().app_data_dir()?);
