@@ -19,8 +19,6 @@ jobs:
     timeout-minutes: 25
     env:
       CARGO_BUILD_JOBS: 3
-      MUSIC_NATIVE_DATA_DIR: ${{ runner.temp }}/rhine-native-test
-      MUSIC_DATA_DIR: ${{ runner.temp }}/rhine-web-test
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -39,4 +37,7 @@ jobs:
           npm ci
           npm --prefix frontend ci
       - name: Check frontend and native code
+        env:
+          MUSIC_NATIVE_DATA_DIR: ${{ runner.temp }}/rhine-native-test
+          MUSIC_DATA_DIR: ${{ runner.temp }}/rhine-web-test
         run: bash scripts/check.sh
