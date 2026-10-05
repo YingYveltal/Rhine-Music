@@ -1,6 +1,6 @@
 {
   "protocol": "issue18-night-v1",
-  "baselineCommit": "05e8532360b7e5c9121bba757512c76bb8295ec9",
+  "baselineCommit": "ff30a9a6bd82445d926b26c0ed6ac59a9d0e6d35",
   "qaCommit": null,
   "appSha256": null,
   "fixtureManifestSha256": "92738d1a7f415be0d466ee877cf4f8506ae453182a7e56f522eb00cfb8a4683f",

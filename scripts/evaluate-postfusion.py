@@ -14,6 +14,16 @@ ORDER = [
 ]
 QUALITY = dict(scale=100, pixelRatio=1.5, antialias='off', shadows=2048,
                aoSamples=32, aoResolution=1, depthOfField=100, transmission=1, anisotropy=16)
+# Exact KeyJ schedule in music-app.ts; actual timer delivery may be arbitrarily late.
+INPUT_SCHEDULE = (
+    [('album-burst', 500 + i * 125) for i in range(32)]
+    + [('open-interrupt', 4700), ('back-interrupt', 4850),
+       ('open-interrupt', 5000), ('back-interrupt', 5150), ('open', 6000)]
+    + [('detail-switch-burst', 7500 + i * 125) for i in range(40)]
+    + [('back', 13000)]
+    + [('genre-burst', 14000 + i * 125) for i in range(32)]
+    + [('final-album-open', 20000)]
+)
 
 
 def require(condition, message):
@@ -27,6 +37,26 @@ def percentile(values, fraction):
     require(all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0 for v in values),
             'Non-finite or negative metric')
     return values[min(len(values) - 1, int(len(values) * fraction))]
+
+
+def validate_environment(environment):
+    for key, expected in [('canvas', [1920, 1182]), ('viewport', [1280, 788]),
+                          ('devicePixelRatio', 2)]:
+        require(environment[key] == expected, 'Protocol environment changed: ' + key)
+
+
+def validate_input_schedule(inputs):
+    require(len(inputs) == len(INPUT_SCHEDULE), 'Incomplete replay')
+    require(all(isinstance(i['scheduledMs'], (int, float)) and math.isfinite(i['scheduledMs'])
+                for i in inputs), 'Non-finite planned input time')
+    # beginMeasurement.start precedes KeyJ's shared performance.now() by synchronous
+    # setup only. Permit up to 5 ms for that common offset, not per-event jitter.
+    offset = inputs[0]['scheduledMs'] - INPUT_SCHEDULE[0][1]
+    require(0 <= offset <= 5, 'Unexpected input schedule start offset')
+    for item, (action, planned_ms) in zip(inputs, INPUT_SCHEDULE):
+        require(item['action'] == action, 'Unexpected input schedule order')
+        require(abs(item['scheduledMs'] - planned_ms - offset) <= .01,
+                'Unexpected planned input time')
 
 
 def metrics(report, variant, environment):
@@ -54,10 +84,7 @@ def metrics(report, variant, environment):
     require(interaction['finalState'] == dict(albumId=environment['expectedFinalAlbum'],
             pending=False, phase='detail') and meta['expectedFinalAlbum'] == environment['expectedFinalAlbum'],
             'Incorrect final album or phase')
-    expected_actions = {'album-burst': 32, 'detail-switch-burst': 40, 'genre-burst': 32,
-                        'open-interrupt': 2, 'back-interrupt': 2, 'open': 1, 'back': 1, 'final-album-open': 1}
-    counts = {name: sum(i['action'] == name for i in inputs) for name in expected_actions}
-    require(counts == expected_actions, 'Unexpected input schedule')
+    validate_input_schedule(inputs)
     columns = [i['pose'][10] for i in inputs if i['action'] == 'genre-burst']
     require(max(columns) - min(columns) > .001, 'No actual cross-column motion')
     raw = report['raw']
@@ -98,7 +125,7 @@ def evaluate(manifest_path):
     require(manifest['visualReviewedPass'] is True, 'Visual review must pass before performance')
     for key in ['baselineCommit', 'qaCommit', 'appSha256', 'fixtureManifestSha256', 'storeId', 'powerCondition']:
         require(bool(manifest[key]), 'Missing frozen binding: ' + key)
-    require(manifest['environment']['canvas'] == [1920, 1182], 'Protocol buffer changed')
+    validate_environment(manifest['environment'])
     require([r['id'] for r in manifest['runs']] == [name for name, _ in ORDER], 'Run order changed')
     rows, files, timestamps = {}, [], []
     for run, (name, variant) in zip(manifest['runs'], ORDER):
@@ -115,7 +142,9 @@ def evaluate(manifest_path):
     return dict(protocol=manifest['protocol'], bindings={k: manifest[k] for k in
                 ['baselineCommit', 'qaCommit', 'appSha256', 'fixtureManifestSha256', 'storeId', 'powerCondition']},
                 environment=manifest['environment'], files=files, metrics=rows, decision=decision(rows),
-                note='RAF and event-to-submission only; not GPU completion or real display latency.')
+                note='RAF and event-to-submission only; not GPU completion or real display latency. '
+                     'Bindings are declarations: coordinator must verify launch logs, package hash, '
+                     'process continuity and each warm-up separately.')
 
 
 if __name__ == '__main__':
