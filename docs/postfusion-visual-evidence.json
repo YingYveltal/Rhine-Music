@@ -1,0 +1,1182 @@
+{
+  "sourceCommit": "8f09303ee767ff9eeb7e206a438745f3fa7bab0f",
+  "reports": [
+    {
+      "report": "data-final/benchmarks/20261005-155542-postfusion-visual-1791215742438.json",
+      "sha256": "9723b9ea8d486f9037f84a3faf6d9341658e79da39a24574e09fe3c63e5c5385",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-155542-postfusion-visual-1791215742438-A1.png",
+          "sha256": "4d87b6ac49b46a9bbb92d549e72e28525cd2bb79cba101b135f3e03a66b4c393"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-155542-postfusion-visual-1791215742438-A2.png",
+          "sha256": "4d87b6ac49b46a9bbb92d549e72e28525cd2bb79cba101b135f3e03a66b4c393"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-155542-postfusion-visual-1791215742438-B.png",
+          "sha256": "5edde690a23d2aeea3ef2e793768824c501d1083a49ceb2304a09e621d522b6b"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-155542-postfusion-visual-1791215742438-A3.png",
+          "sha256": "4d87b6ac49b46a9bbb92d549e72e28525cd2bb79cba101b135f3e03a66b4c393"
+        }
+      ],
+      "measuredAt": "2026-10-05T15:55:42.438Z",
+      "theme": "day",
+      "phase": "archive",
+      "pose": [
+        -109.65810984805428,
+        59.70951553014527,
+        65.70298404716428,
+        -0.8785739291569375,
+        0.4864588863182917,
+        0.35336153957564514,
+        0,
+        -1.5578534773172024,
+        -2.17,
+        0,
+        -10.4,
+        0,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.0139867862654321
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-155642-postfusion-visual-1791215802211.json",
+      "sha256": "8fdd93788d4f8a3b0255e5fd8ee55e51a3a2fe6656d518320c8c13584bd10a4b",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-155642-postfusion-visual-1791215802211-A1.png",
+          "sha256": "25b9c98bfef2b9f8a8035b18712fa75ea8b501c07a6d6e69a1d21e429bf9414c"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-155642-postfusion-visual-1791215802211-A2.png",
+          "sha256": "25b9c98bfef2b9f8a8035b18712fa75ea8b501c07a6d6e69a1d21e429bf9414c"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-155642-postfusion-visual-1791215802211-B.png",
+          "sha256": "a207334b8f688ec33c4c0854b1867c5be8344d3825b9ce8bd7f73836f51dff7a"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-155642-postfusion-visual-1791215802211-A3.png",
+          "sha256": "25b9c98bfef2b9f8a8035b18712fa75ea8b501c07a6d6e69a1d21e429bf9414c"
+        }
+      ],
+      "measuredAt": "2026-10-05T15:56:42.211Z",
+      "theme": "day",
+      "phase": "placing",
+      "pose": [
+        -109.65618149704387,
+        59.706527745225074,
+        65.70361712376918,
+        -0.8785514181337603,
+        0.48648202249372735,
+        0.3533624628275116,
+        0,
+        -1.437005815543646,
+        -2.17,
+        0,
+        -10.4,
+        0.00019985457591018948,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.013657166280864198
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-155656-postfusion-visual-1791215816446.json",
+      "sha256": "e9745c71499d5958954a5825bb84b86c7f0decdfb7e7235d3d166299a4f77718",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-155656-postfusion-visual-1791215816446-A1.png",
+          "sha256": "88f6bbc05b5692a506e795475a532c7844bbdf8732936017b37188574d53c1a7"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-155656-postfusion-visual-1791215816446-A2.png",
+          "sha256": "88f6bbc05b5692a506e795475a532c7844bbdf8732936017b37188574d53c1a7"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-155656-postfusion-visual-1791215816446-B.png",
+          "sha256": "f4f27a05c7b5e4ac261be5c1a673be736ff209ec2399d9b9d26ab5c041c6d68f"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-155656-postfusion-visual-1791215816446-A3.png",
+          "sha256": "88f6bbc05b5692a506e795475a532c7844bbdf8732936017b37188574d53c1a7"
+        }
+      ],
+      "measuredAt": "2026-10-05T15:56:56.446Z",
+      "theme": "day",
+      "phase": "presented",
+      "pose": [
+        -6.814251713870563,
+        27.651834621626335,
+        65.15736457114978,
+        2.6019036769821704,
+        3.0263843021781773,
+        -1.84206239818862,
+        0,
+        1.0737141824997174,
+        -2.17,
+        0,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.005645495756172839
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-155717-postfusion-visual-1791215837192.json",
+      "sha256": "6361ce542d92a4860e9e18de295d785a9f2bfd52ac4a8c4b1b666b0c69b88f1d",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-155717-postfusion-visual-1791215837192-A1.png",
+          "sha256": "88f6bbc05b5692a506e795475a532c7844bbdf8732936017b37188574d53c1a7"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-155717-postfusion-visual-1791215837192-A2.png",
+          "sha256": "88f6bbc05b5692a506e795475a532c7844bbdf8732936017b37188574d53c1a7"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-155717-postfusion-visual-1791215837192-B.png",
+          "sha256": "f4f27a05c7b5e4ac261be5c1a673be736ff209ec2399d9b9d26ab5c041c6d68f"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-155717-postfusion-visual-1791215837192-A3.png",
+          "sha256": "88f6bbc05b5692a506e795475a532c7844bbdf8732936017b37188574d53c1a7"
+        }
+      ],
+      "measuredAt": "2026-10-05T15:57:17.192Z",
+      "theme": "day",
+      "phase": "presented",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        1.0737141824997174,
+        -2.17,
+        0,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.005645495756172839
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-155815-postfusion-visual-1791215895243.json",
+      "sha256": "53da400c26f9787ea2441208996452b4fcb5fed1021dc42520f3b3776feb1ec8",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-155815-postfusion-visual-1791215895243-A1.png",
+          "sha256": "03e579f6402a9239eb44c8a53713a7598ab262f77dcba8c46f6a9d264a93dc5b"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-155815-postfusion-visual-1791215895243-A2.png",
+          "sha256": "03e579f6402a9239eb44c8a53713a7598ab262f77dcba8c46f6a9d264a93dc5b"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-155815-postfusion-visual-1791215895243-B.png",
+          "sha256": "f9d135c02498765fc8f5bd0ec409e993765649a8361452c3b28d8c3006f68fbe"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-155815-postfusion-visual-1791215895243-A3.png",
+          "sha256": "03e579f6402a9239eb44c8a53713a7598ab262f77dcba8c46f6a9d264a93dc5b"
+        }
+      ],
+      "measuredAt": "2026-10-05T15:58:15.243Z",
+      "theme": "day",
+      "phase": "placing",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        0.6044464189871679,
+        -2.086402247851475,
+        -1.776402247851475,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.005516613618827161
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-155904-postfusion-visual-1791215943962.json",
+      "sha256": "cdf28dd3616be265bbe2809b3d3ddc5133dd1f8ff72d22669dd74f0456b339f4",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-155904-postfusion-visual-1791215943962-A1.png",
+          "sha256": "94b8e955252459fe5ce2d4c435884876c6cdd11c05867b5fb53ed5c9f5ad104c"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-155904-postfusion-visual-1791215943962-A2.png",
+          "sha256": "94b8e955252459fe5ce2d4c435884876c6cdd11c05867b5fb53ed5c9f5ad104c"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-155904-postfusion-visual-1791215943962-B.png",
+          "sha256": "2ab91474fdd8644d582c33e4b7624e42235c84a7721189c4c50d16bad2fff76c"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-155904-postfusion-visual-1791215943962-A3.png",
+          "sha256": "94b8e955252459fe5ce2d4c435884876c6cdd11c05867b5fb53ed5c9f5ad104c"
+        }
+      ],
+      "measuredAt": "2026-10-05T15:59:03.962Z",
+      "theme": "day",
+      "phase": "placing",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        0.5963598521314384,
+        -1.844858144816337,
+        -4.014858144816337,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.005332875192901235
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-160018-postfusion-visual-1791216018448.json",
+      "sha256": "f76d1d47f74cee4d13a9c5aaca3c3fafa5c6389b61002a03513d1f6977319718",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-160018-postfusion-visual-1791216018448-A1.png",
+          "sha256": "d172e86afc8c9f04fcdd3e05230d4a437c2d10fce542fa8f629a6a8e791bb179"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-160018-postfusion-visual-1791216018448-A2.png",
+          "sha256": "d172e86afc8c9f04fcdd3e05230d4a437c2d10fce542fa8f629a6a8e791bb179"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-160018-postfusion-visual-1791216018448-B.png",
+          "sha256": "98b89389a85be99a29feba07e5fa4193b407773e5386bf7b43ed9297d802a74d"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-160018-postfusion-visual-1791216018448-A3.png",
+          "sha256": "d172e86afc8c9f04fcdd3e05230d4a437c2d10fce542fa8f629a6a8e791bb179"
+        }
+      ],
+      "measuredAt": "2026-10-05T16:00:18.448Z",
+      "theme": "night",
+      "phase": "archive",
+      "pose": [
+        -109.63860984788836,
+        59.65301553001622,
+        65.70298404716428,
+        -0.8785739291569375,
+        0.4864588863182917,
+        0.3533615395756451,
+        0,
+        -1.59669154855033,
+        -2.169999999999999,
+        -4.339999999999999,
+        -10.4,
+        0,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.011551890432098763
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-160041-postfusion-visual-1791216041049.json",
+      "sha256": "1e33f78704618d7dc7cf0faf9a9475185cf7e77685937fd3fc0a1b2329c8451e",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-160041-postfusion-visual-1791216041049-A1.png",
+          "sha256": "611f0011aa666728dfb6b363d9a4d72dcc795786940034772fd4c753d332c233"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-160041-postfusion-visual-1791216041049-A2.png",
+          "sha256": "611f0011aa666728dfb6b363d9a4d72dcc795786940034772fd4c753d332c233"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-160041-postfusion-visual-1791216041049-B.png",
+          "sha256": "026b98e83e32d6acc768de7a2aef55df919909e50684062295fc18bbefde5b31"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-160041-postfusion-visual-1791216041049-A3.png",
+          "sha256": "611f0011aa666728dfb6b363d9a4d72dcc795786940034772fd4c753d332c233"
+        }
+      ],
+      "measuredAt": "2026-10-05T16:00:41.049Z",
+      "theme": "night",
+      "phase": "placing",
+      "pose": [
+        -105.69427690138713,
+        58.33246530671465,
+        67.93953389078246,
+        -0.7868167880343592,
+        0.5751606592941982,
+        0.3520464824120603,
+        0,
+        -1.1804629243277265,
+        -2.169999999999999,
+        -4.339999999999999,
+        -10.4,
+        0.12584378733699467,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.011514756944444444
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-160106-postfusion-visual-1791216066156.json",
+      "sha256": "cfa30f22993111126ac6f6bae6751310fa9fca0ce4be0a913e5097db0b2c4fbd",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-160106-postfusion-visual-1791216066156-A1.png",
+          "sha256": "e26e80a5f0517467fa3e85cdeb7cd088450acc524002a4217f876b379aaa2f1e"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-160106-postfusion-visual-1791216066156-A2.png",
+          "sha256": "e26e80a5f0517467fa3e85cdeb7cd088450acc524002a4217f876b379aaa2f1e"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-160106-postfusion-visual-1791216066156-B.png",
+          "sha256": "7c745d5d3a83afc939e752e61b1b3d9c21f8eb3cd7e14e364f4c666db456a39d"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-160106-postfusion-visual-1791216066156-A3.png",
+          "sha256": "e26e80a5f0517467fa3e85cdeb7cd088450acc524002a4217f876b379aaa2f1e"
+        }
+      ],
+      "measuredAt": "2026-10-05T16:01:06.156Z",
+      "theme": "night",
+      "phase": "presented",
+      "pose": [
+        -6.814251713870563,
+        27.65183462162633,
+        65.15736457114977,
+        2.601903676982171,
+        3.026384302178177,
+        -1.84206239818862,
+        0,
+        1.0737141824997174,
+        -2.169999999999999,
+        -4.339999999999999,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.0045393277391975306
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-160124-postfusion-visual-1791216083975.json",
+      "sha256": "ee2c04abee963737f34da0f9a31a54d8a5a0c5feef90f39365e67dcf45e151ea",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-160124-postfusion-visual-1791216083975-A1.png",
+          "sha256": "184a3de95640e6063e25f42c454ccdec3979b10d0e31ba0ac4d58a87fe1d10d2"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-160124-postfusion-visual-1791216083975-A2.png",
+          "sha256": "184a3de95640e6063e25f42c454ccdec3979b10d0e31ba0ac4d58a87fe1d10d2"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-160124-postfusion-visual-1791216083975-B.png",
+          "sha256": "8a61957035c7fe6aa9d62638a831a7d1dd8555524e83f808145f5a8a011deb37"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-160124-postfusion-visual-1791216083975-A3.png",
+          "sha256": "184a3de95640e6063e25f42c454ccdec3979b10d0e31ba0ac4d58a87fe1d10d2"
+        }
+      ],
+      "measuredAt": "2026-10-05T16:01:23.975Z",
+      "theme": "night",
+      "phase": "placing",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        0.6026305873032825,
+        -1.92442613754302,
+        -5.95442613754302,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.004157986111111111
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-160156-postfusion-visual-1791216116234.json",
+      "sha256": "10aa78acf687c218321c043c33b0c1c8a613a2d95ab7ce6d0df6905776a88e46",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-160156-postfusion-visual-1791216116234-A1.png",
+          "sha256": "e01a6d13b1df8adf3cb149e0fff65ee152144b6c431af03615816c21a479fe35"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-160156-postfusion-visual-1791216116234-A2.png",
+          "sha256": "e01a6d13b1df8adf3cb149e0fff65ee152144b6c431af03615816c21a479fe35"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-160156-postfusion-visual-1791216116234-B.png",
+          "sha256": "510fc3a8e54005b32848b91b5581dcc625ee24e6a97ebf03f5088d33b14593c1"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-160156-postfusion-visual-1791216116234-A3.png",
+          "sha256": "e01a6d13b1df8adf3cb149e0fff65ee152144b6c431af03615816c21a479fe35"
+        }
+      ],
+      "measuredAt": "2026-10-05T16:01:56.234Z",
+      "theme": "night",
+      "phase": "returning-array",
+      "pose": [
+        -6.851381121888435,
+        27.665586664330608,
+        65.18695014416129,
+        2.600177845884352,
+        3.0250358166804254,
+        -1.8397119148196168,
+        0,
+        0.8120541978577389,
+        -2.169999999999998,
+        -6.199999999999998,
+        -10.4,
+        0.9931028124207976,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.0043582417052469135
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-160224-postfusion-visual-1791216144571.json",
+      "sha256": "7f18f40c446f79992dce25a78f0df4c6697af359bb0f95f076d6719b499ad10f",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-160224-postfusion-visual-1791216144571-A1.png",
+          "sha256": "31504159c91167c858b1a6482d34b6668d7af3882f8d1d4cf5698d7cf04a8c2c"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-160224-postfusion-visual-1791216144571-A2.png",
+          "sha256": "31504159c91167c858b1a6482d34b6668d7af3882f8d1d4cf5698d7cf04a8c2c"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-160224-postfusion-visual-1791216144571-B.png",
+          "sha256": "9c16dfff790aa8f72dc58f53bfbea522b8106edf37291b9729840d279086f6f1"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-160224-postfusion-visual-1791216144571-A3.png",
+          "sha256": "31504159c91167c858b1a6482d34b6668d7af3882f8d1d4cf5698d7cf04a8c2c"
+        }
+      ],
+      "measuredAt": "2026-10-05T16:02:24.571Z",
+      "theme": "day",
+      "phase": "placing",
+      "pose": [
+        -104.6671929564368,
+        57.99504075346429,
+        68.4728230148585,
+        -0.7619194839733088,
+        0.5980697426224113,
+        0.35053398057273016,
+        0,
+        -1.1253659061437524,
+        -2.169999999999999,
+        -6.199999999999999,
+        -10.4,
+        0.14783234587985794,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.014016685956790124
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    },
+    {
+      "report": "data-final/benchmarks/20261005-160252-postfusion-visual-1791216172494.json",
+      "sha256": "f3ce35bc2584e40cff707d4aaf1b6da3c40f2d5668b69228b982c9b589627f29",
+      "frames": [
+        {
+          "name": "A1",
+          "postFusion": false,
+          "file": "visual/20261005-160252-postfusion-visual-1791216172494-A1.png",
+          "sha256": "6be0b696c5b5b136da341d91fc023c025adbdaa6e49e1ffd58552b8b1a36f101"
+        },
+        {
+          "name": "A2",
+          "postFusion": false,
+          "file": "visual/20261005-160252-postfusion-visual-1791216172494-A2.png",
+          "sha256": "6be0b696c5b5b136da341d91fc023c025adbdaa6e49e1ffd58552b8b1a36f101"
+        },
+        {
+          "name": "B",
+          "postFusion": true,
+          "file": "visual/20261005-160252-postfusion-visual-1791216172494-B.png",
+          "sha256": "3a0254b23dc575f70e2753d8d113321571842cda4edf4bbd0a0b58bc613171b5"
+        },
+        {
+          "name": "A3",
+          "postFusion": false,
+          "file": "visual/20261005-160252-postfusion-visual-1791216172494-A3.png",
+          "sha256": "6be0b696c5b5b136da341d91fc023c025adbdaa6e49e1ffd58552b8b1a36f101"
+        }
+      ],
+      "measuredAt": "2026-10-05T16:02:52.494Z",
+      "theme": "day",
+      "phase": "returning-array",
+      "pose": [
+        -6.9459793258805576,
+        27.70049923950837,
+        65.26158974718285,
+        2.5957911902623896,
+        3.0216180783269024,
+        -1.833772199539003,
+        0,
+        1.030850824729188,
+        -2.169999999999999,
+        -6.199999999999999,
+        -10.4,
+        0.983321650672946,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.00554759837962963
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "pixelGate": true,
+      "restoredFlag": false
+    }
+  ],
+  "baselineCommit": "ff30a9a6bd82445d926b26c0ed6ac59a9d0e6d35",
+  "packageSha256": "5973873a9aba168532deaa4aeaa3876be2fff4466423347120ea44745c5dee3a",
+  "executableSha256": "318267244e59b38a67bbcf5f062dd68a5f20d05244111a6cf92e193c282babb9",
+  "status": "partial-visual-review-overlap-not-proven-no-performance",
+  "artifactRoot": ".local/postfusion-qa",
+  "artifacts": [
+    {
+      "file": "build-evidence.json",
+      "sha256": "a8210153bc3e41c88dc826371e747ec84f93fc2c49662a2ca57d2a789cd1907e"
+    },
+    {
+      "file": "source-diff-evidence.json",
+      "sha256": "abd2961c47345cd7070d76a6ca442186d0f9fb16c849d894a3af613576c992da"
+    },
+    {
+      "file": "actual-harness.diff",
+      "sha256": "7c38e1d660212d3568de53af12b6e38c2690646f188130d2e4f5607a613db120"
+    },
+    {
+      "file": "launch-final.json",
+      "sha256": "8e17263ff4dd3f3d9d8a929e67fa5f6fbfc3031e01f3f95c0f315dc96e34ce76"
+    },
+    {
+      "file": "launch-final.log",
+      "sha256": "9c1315c9e82d024342071e3eb178023dc0bc3a5fbfe309de50ab820411fa66f5"
+    },
+    {
+      "file": "first-invalid-impact.json",
+      "sha256": "8f2785ac5680fddaf989816ccaef9e1450e61265cc1b5e9b6f9b5890131fb98a"
+    },
+    {
+      "file": "visual-environment.json",
+      "sha256": "b1f8d8cd0c3f15409dc2b75d988911aef8b4acef12add4eac4d25e8f41997b85"
+    },
+    {
+      "file": "visual-evidence.json",
+      "sha256": "7e596cc8507e754137eb6a950be55e0bec794c73ae0d427324c79c533c778dc5"
+    },
+    {
+      "file": "native-build-final.log",
+      "sha256": "0536080e8f115aa66f00c08edbe97a1d816f7fc1dab881f5764c5be8a44f2ceb"
+    },
+    {
+      "file": "frontend-build.log",
+      "sha256": "a807d5b26e79f87734ea74099dae528879119eb8aab1b026eb5b56c00f487566"
+    },
+    {
+      "file": "music-checks.log",
+      "sha256": "fdc838dbd613aec338851db738fb3f560038cccd73b244b992b9f2a1e39991c5"
+    },
+    {
+      "file": "content-checks.log",
+      "sha256": "08de2657bbbef8d6d87ce783db8216cd9e76a4205fb0fe4abb304986558955ba"
+    },
+    {
+      "file": "viewport-checks.log",
+      "sha256": "3cd8cd5c12e9f5ab82e484f4dd2c39fa75b1515889dc2eed5df3534159df49ef"
+    }
+  ]
+}
