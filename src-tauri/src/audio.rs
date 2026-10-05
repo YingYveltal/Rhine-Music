@@ -23,6 +23,8 @@ pub struct Playback {
     pub transport: String,
     pub bgm_playing: bool,
     pub bgm_error: Option<String>,
+    pub applied_command: u64,
+    pub worker_error: Option<String>,
 }
 enum Command {
     Play(Vec<Track>, usize),
@@ -33,8 +35,13 @@ enum Command {
     Volume(f32, f32, f32, bool, bool),
     Quit,
 }
+struct QueuedCommand {
+    sequence: u64,
+    command: Command,
+}
 pub struct Audio {
-    tx: Sender<Command>,
+    tx: Sender<QueuedCommand>,
+    sequence: Mutex<u64>,
     state: Arc<Mutex<Playback>>,
 }
 impl Audio {
@@ -46,29 +53,35 @@ impl Audio {
         let state = Arc::new(Mutex::new(Playback::default()));
         let out = state.clone();
         std::thread::spawn(move || worker(rx, out, assets,resolver));
-        Self { tx, state }
+        Self { tx, state, sequence: Mutex::new(0) }
     }
-    pub fn play(&self, tracks: Vec<Track>, index: usize) {
-        let _ = self.tx.send(Command::Play(tracks, index));
+    fn send(&self, command: Command) -> anyhow::Result<u64> {
+        // Keep allocation and enqueue under one lock, including concurrent callers.
+        let mut sequence = self.sequence.lock().unwrap();
+        let next = *sequence + 1;
+        self.tx.send(QueuedCommand { sequence: next, command })
+            .map_err(|_| anyhow::anyhow!("音频线程不可用"))?;
+        *sequence = next;
+        Ok(next)
     }
-    pub fn toggle(&self) {
-        let _ = self.tx.send(Command::Toggle);
+    pub fn play(&self, tracks: Vec<Track>, index: usize) -> anyhow::Result<u64> {
+        self.send(Command::Play(tracks, index))
     }
-    pub fn stop(&self) {
-        let _ = self.tx.send(Command::Stop);
+    pub fn toggle(&self) -> anyhow::Result<u64> {
+        self.send(Command::Toggle)
     }
-    pub fn seek(&self, seconds: f64) {
-        if seconds.is_finite() {
-            let _ = self.tx.send(Command::Seek(seconds.max(0.)));
-        }
+    pub fn stop(&self) -> anyhow::Result<u64> {
+        self.send(Command::Stop)
     }
-    pub fn unlock(&self) {
-        let _ = self.tx.send(Command::Unlock);
+    pub fn seek(&self, seconds: f64) -> anyhow::Result<u64> {
+        anyhow::ensure!(seconds.is_finite(), "位置必须为有限数字");
+        self.send(Command::Seek(seconds.max(0.)))
     }
-    pub fn settings(&self, volume: f32, bgm: f32, effect: f32, enabled: bool, fade: bool) {
-        let _ = self
-            .tx
-            .send(Command::Volume(volume, bgm, effect, enabled, fade));
+    pub fn unlock(&self) -> anyhow::Result<u64> {
+        self.send(Command::Unlock)
+    }
+    pub fn settings(&self, volume: f32, bgm: f32, effect: f32, enabled: bool, fade: bool) -> anyhow::Result<u64> {
+        self.send(Command::Volume(volume, bgm, effect, enabled, fade))
     }
     pub fn snapshot(&self) -> Playback {
         self.state.lock().unwrap().clone()
@@ -76,21 +89,27 @@ impl Audio {
 }
 impl Drop for Audio {
     fn drop(&mut self) {
-        let _ = self.tx.send(Command::Quit);
+        let _ = self.send(Command::Quit);
     }
 }
-fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,resolver:Option<Resolver>) {
+fn startup_failed(state: &Mutex<Playback>, error: String) {
+    let mut state = state.lock().unwrap();
+    state.transport = "error".into();
+    state.error = Some(error.clone());
+    state.worker_error = Some(error);
+}
+fn worker(rx: Receiver<QueuedCommand>, state: Arc<Mutex<Playback>>, assets: PathBuf,resolver:Option<Resolver>) {
     let (_stream, handle) = match OutputStream::try_default() {
         Ok(v) => v,
         Err(e) => {
-            state.lock().unwrap().error = Some(format!("无法打开音频设备：{e}"));
+            startup_failed(&state, format!("无法打开音频设备：{e}"));
             return;
         }
     };
     let sink = match Sink::try_new(&handle) {
         Ok(s) => s,
         Err(e) => {
-            state.lock().unwrap().error = Some(e.to_string());
+            startup_failed(&state, e.to_string());
             return;
         }
     };
@@ -113,7 +132,7 @@ fn worker(rx: Receiver<Command>, state: Arc<Mutex<Playback>>, assets: PathBuf,re
 // The device setup stays above; the same transport loop can use idle sinks in
 // tests without opening an output device or duplicating its transitions.
 fn run_transport(
-    rx: Receiver<Command>,
+    rx: Receiver<QueuedCommand>,
     state: Arc<Mutex<Playback>>,
     mut sink: Sink,
     bgm: Option<Sink>,
@@ -143,8 +162,10 @@ fn run_transport(
     let mut bgm_target = 0.;
     state.lock().unwrap().transport = "idle".into();
     loop {
-        if let Ok(cmd) = rx.recv_timeout(Duration::from_millis(10)) {
-            match cmd {
+        let mut applied = None;
+        if let Ok(queued) = rx.recv_timeout(Duration::from_millis(10)) {
+            applied = Some(queued.sequence);
+            match queued.command {
                 Command::Quit => break,
                 Command::Play(tracks, i) => {
                     if i < tracks.len() {
@@ -346,6 +367,8 @@ fn run_transport(
             sink.get_pos().as_secs_f64()
         };
         s.bgm_playing = bgm_gain > 0.001 && bgm.is_some();
+        // Publish the acknowledgment only with this iteration's final snapshot.
+        if let Some(sequence) = applied { s.applied_command = sequence; }
     }
     epoch.fetch_add(1,Ordering::SeqCst);
 }
@@ -394,7 +417,7 @@ mod tests {
         };
         let assets = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../frontend/public");
         let player = Audio::new(assets);
-        player.settings(0., 0., 0., false, false);
+        player.settings(0., 0., 0., false, false).unwrap();
         let wait = |predicate: &dyn Fn(&Playback) -> bool| {
             let start = Instant::now();
             loop {
@@ -407,20 +430,20 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(20));
             }
         };
-        player.play(vec![track.clone()], 0);
+        player.play(vec![track.clone()], 0).unwrap();
         wait(&|s| s.playing && s.elapsed > 0.1);
-        player.toggle();
+        player.toggle().unwrap();
         wait(&|s| s.transport == "paused" && !s.playing);
-        player.seek(3.);
+        player.seek(3.).unwrap();
         wait(&|s| (s.elapsed - 3.).abs() < 0.1);
-        player.play(vec![track.clone()], 0);
+        player.play(vec![track.clone()], 0).unwrap();
         wait(&|s| s.playing && s.elapsed > 3.1);
         let mut next = track.clone();
         next.id = "next".into();
-        player.play(vec![track, next], 0);
-        player.seek(9.9);
+        player.play(vec![track, next], 0).unwrap();
+        player.seek(9.9).unwrap();
         wait(&|s| s.track.as_ref().is_some_and(|t| t.id == "next") && s.playing);
-        player.stop();
+        player.stop().unwrap();
         wait(&|s| s.transport == "idle" && !s.playing && s.elapsed == 0.);
     }
 }

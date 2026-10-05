@@ -356,7 +356,7 @@ fn toggle_fullscreen(window: tauri::WebviewWindow) -> std::result::Result<(), St
 }
 #[tauri::command]
 async fn qq_request(core:State<'_,Arc<Core>>,operation:String,body:Option<Value>)->std::result::Result<Value,String>{
-    if operation=="logout" {core.audio.stop();}
+    if operation=="logout" {let _ = core.audio.stop();}
     let qq=core.qq.clone();
     tauri::async_runtime::spawn_blocking(move||qq.request(&operation,body.unwrap_or(json!({}))).map_err(|e|e.to_string())).await.map_err(|_|"QQ 后台任务未完成".to_owned())?
 }
@@ -371,8 +371,8 @@ fn player_command(
     id: Option<String>,
     ids: Option<Vec<String>>,
     value: Option<Value>,
-) -> std::result::Result<(), String> {
-    (|| -> Result<()> {
+) -> std::result::Result<u64, String> {
+    (|| -> Result<u64> {
         match operation.as_str() {
             "play" => {
                 let id = id.context("缺少曲目 ID")?;
@@ -399,7 +399,7 @@ fn player_command(
                     .iter()
                     .position(|t| t.id == id)
                     .context("歌曲不在队列中")?;
-                core.audio.play(tracks, index);
+                core.audio.play(tracks, index)
             }
             "toggle" => core.audio.toggle(),
             "stop" => core.audio.stop(),
@@ -418,11 +418,10 @@ fn player_command(
                     0.,
                     v["bgmEnabled"].as_bool().unwrap_or(true),
                     v["songFadeEnabled"].as_bool().unwrap_or(true),
-                );
+                )
             }
             _ => bail!("不支持的播放操作"),
         }
-        Ok(())
     })()
     .map_err(|e| e.to_string())
 }
