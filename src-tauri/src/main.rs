@@ -2,6 +2,7 @@ mod audio;
 mod library;
 mod online;
 mod qq;
+mod qq_session;
 mod qq_audio;
 use anyhow::{bail, Context, Result};
 use library::{timestamp, Library, Rules};
@@ -535,7 +536,12 @@ fn main() {
                 qq:qq.clone(),
             });
             app.manage(core.clone());
-            if qq.status()["connected"]==true && qq.albums().is_empty(){let _=qq.start_sync();}
+            if qq.status()["connectionState"]=="unverified" {
+                let connection=qq.clone();
+                std::thread::spawn(move||{
+                    if connection.request("validate",json!({})).is_ok() && connection.albums().is_empty(){let _=connection.start_sync();}
+                });
+            }
             if scan {
                 start_scan(core, app.handle().clone(), &json!({}))?;
             }
