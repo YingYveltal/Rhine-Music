@@ -1,5 +1,5 @@
 import { nativeInvoke } from './native';
-import { createQqLogin } from './qq-login';
+import { createQqLogin, validationMessage } from './qq-login';
 import './qq-music.css';
 export interface QqStatus {
   connected: boolean; officialConfigured: boolean; enabled: boolean; remembered?: boolean;
@@ -58,7 +58,7 @@ export function mountQqPanel(root: HTMLElement, refresh: () => Promise<void>, re
     el('qr').hidden = true; await login.start();
   });
   el('cancel').onclick = () => { login.cancel(); el('qr').hidden = true; feedback('已取消本次扫码，原连接保持不变。'); };
-  el('validate').onclick = () => void run(async () => { show(await call('validate')); feedback('连接验证通过。'); });
+  el('validate').onclick = () => void run(async () => { const status = await call('validate'); show(status); feedback(validationMessage(status)); });
   el('sync').onclick = () => void run(async () => { show(await call('sync')); await refresh(); feedback('正在后台同步，可以关闭此面板继续浏览。'); });
   el('local').onclick = () => void run(async () => { show(await call('local')); await refresh(); feedback('已导入本机 QQ 曲库快照。在线播放仍需连接账户。'); });
   el<HTMLInputElement>('enabled').onchange = (e) => void run(async () => { show(await call('enable', {enabled:(e.target as HTMLInputElement).checked})); await refresh(); feedback('显示设置已保存。'); });

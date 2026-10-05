@@ -2,6 +2,12 @@ type Reply = { attemptId?: number; image?: string; message?: string; connected?:
 type Call = (operation: string, body?: object) => Promise<Reply>;
 type Events = { image: (image: string) => void; message: (message: string) => void; connected: () => void };
 
+export function validationMessage(status: { connected: boolean; connectionState?: string; connectionNotice?: string | null }) {
+  if (status.connectionState === 'checking') return '连接仍在验证中，请稍候。';
+  if (status.connected) return '连接验证通过。';
+  return status.connectionNotice || '当前登录已过期或尚未连接，请重新扫码。';
+}
+
 // A panel owns one attempt. Check ownership after every asynchronous reply,
 // including login_start: closing before the reservation arrives must cancel it.
 export function createQqLogin(call: Call, events: Events, delay = 2000) {

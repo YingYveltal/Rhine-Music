@@ -188,13 +188,30 @@ fn make_album(id:&str,name:&str,genre:&str,raw:&[Value],cover:Option<Cover>)->(A
 
 #[cfg(test)] mod tests {
     use super::*;
-    #[test] fn cancel_preserves_library_and_logout_rejects_late_library_commits() {
-        struct NoKeychain;
-        impl crate::qq_session::CredentialStore for NoKeychain {
-            fn load(&mut self)->Result<Option<Credentials>> { panic!("must not load credentials") }
-            fn save(&mut self,_:&Credentials)->Result<()> { panic!("must not save credentials") }
-            fn delete(&mut self)->Result<()> { panic!("nothing was saved") }
+    struct NoKeychain;
+    impl crate::qq_session::CredentialStore for NoKeychain {
+        fn load(&mut self)->Result<Option<Credentials>> { panic!("must not load credentials") }
+        fn save(&mut self,_:&Credentials)->Result<()> { panic!("must not save credentials") }
+        fn delete(&mut self)->Result<()> { panic!("nothing was saved") }
+    }
+    #[test] fn validate_returns_disconnected_when_cookies_expired_before_the_request() {
+        let dir=tempfile::tempdir().unwrap();
+        let web=WebClient::new(Some(&json!({"cookies":[
+            {"domain":".qq.com","name":"uin","value":"10001"},
+            {"domain":".qq.com","name":"qm_keyst","value":"synthetic"}
+        ]}))).unwrap();
+        assert!(web.authenticated());let mut session=web.export_session();
+        for cookie in session["cookieStore"].as_array_mut().unwrap(){
+            cookie["expires"]=json!({"AtUtc":"2000-01-01T00:00:00Z"});
         }
+        let connection=Connection::open(dir.path(),Box::new(NoKeychain),Some(Credentials{session:Some(session),key:String::new()})).unwrap();
+        let qq=Arc::new(Qq{connection,saved:Mutex::new(Saved::default()),job:Mutex::new(json!({"running":false})),root:dir.path().to_owned()});
+        let result=qq.request("validate",json!({})).unwrap();
+        assert_eq!(result["connected"],false);
+        assert_ne!(result["connectionState"],"connected");
+        assert!(result["connectionNotice"].as_str().unwrap().contains("过期"));
+    }
+    #[test] fn cancel_preserves_library_and_logout_rejects_late_library_commits() {
         let dir=tempfile::tempdir().unwrap();
         let connection=Connection::open(dir.path(),Box::new(NoKeychain),None).unwrap();
         let (album,songs)=make_album("qq-synthetic","Synthetic","qq-playlists",&[json!({"mid":"SYNTHETIC","title":"Fixture"})],None);

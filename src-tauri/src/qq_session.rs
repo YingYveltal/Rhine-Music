@@ -272,18 +272,33 @@ impl Connection {
     }
 
     pub fn disconnect(&self, clear_library: impl FnOnce() -> Result<()>) -> Result<()> {
+        let (version, marker_result) = self.clear_connection(clear_library)?;
+        self.forget_saved(version, marker_result)
+    }
+
+    fn clear_connection(&self, clear_library: impl FnOnce() -> Result<()>) -> Result<(u64, Result<()>)> {
         let empty = WebClient::new(None)?;
-        let (marker_result, delete, version) = {
+        let result = {
             let mut state = self.state.lock().unwrap();
             let marker_result = self.disable_restore(&mut state);
             state.web = empty; state.key.clear(); state.pending = None;
             state.version += 1; state.verified = false; state.validating = false;
             state.account_version += 1;
             state.remembered = false; state.notice = None;
-            (marker_result.and(clear_library()), state.stored, state.version)
+            (state.version, marker_result.and(clear_library()))
         };
+        Ok(result)
+    }
+
+    fn forget_saved(&self, version: u64, marker_result: Result<()>) -> Result<()> {
         let mut store = self.store.lock().unwrap();
-        let stored = delete || self.state.lock().unwrap().stored;
+        let stored = {
+            let state = self.state.lock().unwrap();
+            // A newer save may have acquired the store first while disconnect
+            // was waiting. Check again while holding the store, before delete.
+            if state.version != version { bail!("连接已改变，已跳过旧连接删除"); }
+            state.stored
+        };
         let deleted = if stored { store.delete() } else { Ok(()) };
         let mut state = self.state.lock().unwrap();
         if deleted.is_ok() { state.stored = false; }
@@ -515,6 +530,37 @@ mod tests {
         assert_eq!(connection.status()["connected"], false);
         resume_tx.send(()).unwrap(); assert!(saving.join().unwrap().is_err()); logout.join().unwrap().unwrap();
         assert!(memory.lock().unwrap().bytes.is_none());
+        assert_eq!(open(dir.path(), &memory, None).status()["officialConfigured"], false);
+    }
+
+    #[test]
+    fn delayed_forget_does_not_delete_a_newer_saved_connection() {
+        let (dir, memory, connection) = setup(); let connection = Arc::new(connection);
+        let (entered_tx, entered_rx) = mpsc::channel(); let (resume_tx, resume_rx) = mpsc::channel();
+        memory.lock().unwrap().save_gate = Some((entered_tx, resume_rx));
+        let saving_a = { let connection = connection.clone(); std::thread::spawn(move || connection.remember()) };
+        entered_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+
+        // Pause disconnect at the real boundary between invalidating A and
+        // acquiring the store lock, then deterministically let B save first.
+        let (old_version, marker_result) = connection.clear_connection(|| Ok(())).unwrap();
+        let id = connection.begin_login();
+        connection.accept_poll(id, web("20002"), &json!({"connected":true}), || {}).unwrap();
+        resume_tx.send(()).unwrap(); assert!(saving_a.join().unwrap().is_err());
+        connection.remember().unwrap();
+        let deletes_before = memory.lock().unwrap().deletes;
+
+        let delayed_result = connection.forget_saved(old_version, marker_result);
+        assert_eq!(memory.lock().unwrap().deletes, deletes_before, "late disconnect must not delete B");
+        assert!(delayed_result.is_err());
+        assert_eq!(connection.status()["remembered"], true);
+        let restored = open(dir.path(), &memory, None);
+        assert_eq!(restored.snapshot().1.uin(), "20002");
+        assert_eq!(restored.status()["remembered"], true);
+
+        connection.disconnect(|| Ok(())).unwrap();
+        assert!(memory.lock().unwrap().bytes.is_none());
+        assert_eq!(connection.status()["remembered"], false);
         assert_eq!(open(dir.path(), &memory, None).status()["officialConfigured"], false);
     }
 }

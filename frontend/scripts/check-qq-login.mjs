@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createQqLogin } from '../src/qq-login.ts';
+import { createQqLogin, validationMessage } from '../src/qq-login.ts';
+
+test('a successful validate RPC with expired cookies does not claim connection success', () => {
+  const expired = { connected: false, connectionState: 'disconnected', connectionNotice: '保存的登录已过期或无法恢复，请重新扫码；已同步曲库仍保留' };
+  assert.equal(validationMessage(expired), expired.connectionNotice);
+  assert.match(validationMessage({ connected: false, connectionState: 'expired' }), /过期/);
+  assert.match(validationMessage({ connected: true, connectionState: 'checking' }), /仍在验证/);
+  assert.equal(validationMessage({ connected: true, connectionState: 'connected' }), '连接验证通过。');
+});
 
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const settle = () => new Promise(resolve => setImmediate(resolve));
