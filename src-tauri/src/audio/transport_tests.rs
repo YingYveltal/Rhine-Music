@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 
 type Output = rodio::queue::SourcesQueueOutput<f32>;
 struct Transport {
-    tx: Sender<Command>,
+    audio: Audio,
     state: Arc<Mutex<Playback>>,
     outputs: Receiver<Output>,
     thread: Option<JoinHandle<()>>,
@@ -22,10 +22,10 @@ impl Transport {
                 Ok(sink)
             });
         });
-        Self { tx, state, outputs, thread: Some(thread) }
+        Self { audio: Audio { tx, state: state.clone(), sequence: Mutex::new(0) }, state, outputs, thread: Some(thread) }
     }
-    fn send(&self, command: Command) { self.tx.send(command).unwrap(); }
-    fn play(&self, queue: &[Track], index: usize) { self.send(Command::Play(queue.to_vec(), index)); }
+    fn send(&self, command: Command) -> u64 { self.audio.send(command).unwrap() }
+    fn play(&self, queue: &[Track], index: usize) -> u64 { self.send(Command::Play(queue.to_vec(), index)) }
     fn wait(&self, predicate: impl Fn(&Playback) -> bool) -> Playback {
         let deadline = Instant::now() + Duration::from_secs(3);
         loop {
@@ -42,7 +42,7 @@ impl Transport {
 }
 impl Drop for Transport {
     fn drop(&mut self) {
-        let _ = self.tx.send(Command::Quit);
+        let _ = self.audio.send(Command::Quit);
         self.thread.take().unwrap().join().unwrap();
     }
 }
@@ -235,4 +235,94 @@ fn superseding_or_stopping_a_resolver_discards_its_late_result() {
         else { assert_eq!(state.track.unwrap().id, "qq-a"); }
         assert!(player.outputs.is_empty(), "obsolete B must never acquire a sink");
     }
+}
+
+#[test]
+fn command_receipts_follow_enqueue_order_and_fail_when_the_worker_is_gone() {
+    let (tx, rx) = crossbeam_channel::unbounded();
+    let audio = Arc::new(Audio { tx, state: Arc::new(Mutex::new(Playback::default())), sequence: Mutex::new(0) });
+    std::thread::scope(|scope| {
+        for _ in 0..8 {
+            let audio = audio.clone();
+            scope.spawn(move || { for _ in 0..8 { audio.stop().unwrap(); } });
+        }
+    });
+    // Accepted receipts never claim worker application, even when IPC has replied.
+    assert_eq!(audio.snapshot().applied_command, 0);
+    for expected in 1..=64 { assert_eq!(rx.try_recv().unwrap().sequence, expected); }
+    startup_failed(&audio.state, "synthetic startup failure".into());
+    let state = audio.snapshot();
+    assert_eq!(state.applied_command, 0);
+    assert_eq!(state.transport, "error");
+    assert_eq!(state.worker_error.as_deref(), Some("synthetic startup failure"));
+    assert!(!state.playing);
+    drop(rx);
+    assert!(audio.stop().is_err(), "a disconnected worker must reject commands");
+    assert!(audio.seek(f64::NAN).is_err());
+}
+
+#[test]
+fn worker_acknowledges_the_updated_snapshot_and_preserves_receipt_on_auto_advance() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = wav(dir.path(), "a", 1600);
+    let b = wav(dir.path(), "b", 80000);
+    let player = Transport::new(None);
+    player.send(Command::Volume(0.7, 0.0, 0.0, false, false));
+    let play = player.play(&[a.clone(), b], 0);
+    let applied = player.wait(|s| s.applied_command == play);
+    assert_eq!(applied.track.unwrap().path, a.path);
+    assert!(applied.playing);
+    assert_eq!(applied.transport, "playing");
+    assert!(applied.error.is_none());
+    let mut output = player.output();
+    consume(&mut output, 3000);
+    let next = player.playing("b");
+    assert_eq!(next.applied_command, play, "automatic progression is not a new user intent");
+    let _b_output = player.output();
+    let pause = player.send(Command::Toggle);
+    let paused = player.wait(|s| s.applied_command == pause);
+    assert_eq!(paused.transport, "paused");
+    assert!(!paused.playing);
+    let stop = player.send(Command::Stop);
+    let stopped = player.wait(|s| s.applied_command == stop);
+    assert_eq!(stopped.transport, "idle");
+    assert!(!stopped.playing);
+    assert_eq!(stopped.elapsed, 0.0);
+}
+
+#[test]
+fn worker_acknowledges_loading_then_keeps_the_receipt_through_resolution_and_seek() {
+    let dir = tempfile::tempdir().unwrap();
+    let resolved = wav(dir.path(), "qq-a", 80000);
+    let (release, gate) = crossbeam_channel::bounded(1);
+    let resolver: Resolver = Arc::new(move |_, _, _| {
+        gate.recv_timeout(Duration::from_secs(3)).unwrap();
+        Ok(resolved.clone())
+    });
+    let player = Transport::new(Some(resolver));
+    let track = Track { id: "qq-a".into(), browser_playable: true, ..Default::default() };
+    let receipt = player.play(&[track], 0);
+    let loading = player.wait(|s| s.applied_command == receipt);
+    assert_eq!(loading.track.unwrap().id, "qq-a");
+    assert_eq!(loading.transport, "loading");
+    assert!(!loading.playing);
+    assert_eq!(loading.elapsed, 0.0);
+    release.send(()).unwrap();
+    let playing = player.playing("qq-a");
+    assert_eq!(playing.applied_command, receipt);
+    let mut output = player.output();
+    let seek = player.send(Command::Seek(3.0));
+    // The real Sink fulfills a seek from its output callback. Supply that clock
+    // in memory until the actual worker publishes its receipt and new position.
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while player.audio.snapshot().applied_command < seek {
+        consume(&mut output, 80);
+        assert!(Instant::now() < deadline, "seek was not acknowledged");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let sought = player.audio.snapshot();
+    assert_eq!(sought.applied_command, seek);
+    assert!(sought.elapsed >= 3.0 && sought.elapsed < 3.5, "{sought:?}");
+    assert_eq!(sought.track.unwrap().id, "qq-a");
+    assert!(sought.error.is_none());
 }
