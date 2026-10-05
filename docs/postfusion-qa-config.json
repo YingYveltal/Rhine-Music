@@ -1,0 +1,17 @@
+{
+  "identifier": "com.rhine.music.issue18-postfusion-qa",
+  "productName": "Rhine Music Postfusion QA",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Rhine Music Postfusion QA",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 640,
+        "minHeight": 500,
+        "backgroundColor": "#eae5e1"
+      }
+    ]
+  }
+}

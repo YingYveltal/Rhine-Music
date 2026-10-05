@@ -31,7 +31,7 @@ import {
 } from "./render-quality";
 import { MusicPlayer, type MusicPlayerState } from "./music-player";
 import { isNative, nativeInvoke, nativeRequest, NativeMusicPlayer } from "./native";
-import { beginMeasurement, recordInteraction, sampleFrame } from "./performance-probe";
+import { beginMeasurement, recordInteraction, sampleFrame, measurementRunning } from "./performance-probe";
 import { ModelViewer } from "./model-viewer";
 import { TerminalAudio } from "./audio";
 import type {
@@ -1680,6 +1680,21 @@ function frame(ms: number) {
 let stressPending = false;
 window.addEventListener("keydown", (event) => {
   if (!event.ctrlKey || !event.altKey || !scene || !ready) return;
+  if (event.code === "KeyY" && import.meta.env.VITE_POSTFUSION_QA === "1") {
+    event.preventDefault();
+    // Only the isolated QA build exposes this local image readback entry point.
+    if (measurementRunning() || stressPending || albums.length !== 16
+      || albums.some(album => !/^QA \d{2} (square|portrait|landscape)$/.test(album.title))) {
+      notify("Postfusion QA: idle measurement and the 16 synthetic albums required"); return;
+    }
+    try {
+      const report = scene.validatePostFusion();
+      if (isNative) void nativeInvoke("save_benchmark", { report })
+        .then(() => notify(`Postfusion pixels: ${report.pixelGate ? "PASS" : "FAIL"}; visual review required`))
+        .catch(error => notify(`Postfusion save failed: ${String(error)}`));
+    } catch (error) { notify(`Postfusion QA rejected: ${String(error)}`); }
+    return;
+  }
   if(event.code === "KeyH" && scene.nativeMetal.stats.active) {event.preventDefault();void nativeInvoke("metal_profile_slow");notify("捕获下一张 GPU 长帧；本轮仅作诊断");return;}
   if(event.code === "KeyR") {event.preventDefault();scene.benchmarkDevicePixelRatio=scene.benchmarkDevicePixelRatio?undefined:2;scene.resize();notify(`Retina 负载对照：${scene.benchmarkDevicePixelRatio ? "开启" : "关闭"}`);return;}
   if(event.code === "KeyT") {event.preventDefault();scene.transmissionDepthEnabled=!scene.transmissionDepthEnabled;notify(`透射深度预计算：${scene.transmissionDepthEnabled ? "开启" : "关闭"}`);return;}
@@ -1703,7 +1718,7 @@ window.addEventListener("keydown", (event) => {
     stressPending=false;
     if(!scene || document.hidden)return;
     const label=`${scene.renderingOptimized ? "optimized" : "baseline"}-stress-${preferences.theme}`;
-    if(!beginMeasurement(label,28,{quality:renderQuality,theme:preferences.theme,albums:albums.length,rateHz:8,expectedFinalAlbum:records[0]?.album?.id,expectedFinalPhase:"detail"},scene))return;
+    if(!beginMeasurement(label,28,{quality:renderQuality,theme:preferences.theme,albums:albums.length,rateHz:8,sortMode:preferences.sortMode,startingAlbum:currentAlbum()?.id,startingPhase:presentation.phase,expectedFinalAlbum:records[0]?.album?.id,expectedFinalPhase:"detail"},scene))return;
     const start=performance.now();
     const schedule=(ms:number,name:string,action:()=>void)=>setTimeout(()=>recordInteraction(name,start+ms,action,scene!),ms);
     for(let i=0;i<32;i++)schedule(500+i*125,"album-burst",()=>stepAlbum(Math.floor(i/8)%2?-1:1));

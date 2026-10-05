@@ -1,0 +1,97 @@
+{
+  "protocol": "issue18-night-v1",
+  "baselineCommit": "05e8532360b7e5c9121bba757512c76bb8295ec9",
+  "qaCommit": null,
+  "appSha256": null,
+  "fixtureManifestSha256": "92738d1a7f415be0d466ee877cf4f8506ae453182a7e56f522eb00cfb8a4683f",
+  "storeId": "D075F93A-B745-4856-B372-9B81E7C54173",
+  "powerCondition": null,
+  "visualReviewedPass": false,
+  "environment": {
+    "canvas": [
+      1920,
+      1182
+    ],
+    "viewport": [
+      1280,
+      788
+    ],
+    "devicePixelRatio": 2,
+    "userAgent": null,
+    "expectedFinalAlbum": null
+  },
+  "runs": [
+    {
+      "id": "AA1-A1",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AA1-A2",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AB1-A",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AB1-B",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AA2-A1",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AA2-A2",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AB2-B",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AB2-A",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AA3-A1",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AA3-A2",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AB3-A",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    },
+    {
+      "id": "AB3-B",
+      "file": null,
+      "sha256": null,
+      "externalInterruption": false
+    }
+  ]
+}

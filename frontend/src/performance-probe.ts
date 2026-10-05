@@ -30,6 +30,7 @@ let active:
       viewport: number[];
       dpr: number;
       canvas: number[];
+      postFusion?: boolean;
       interruptions: string[];
       interrupted: boolean;
       inputs: Input[];
@@ -44,6 +45,7 @@ const percentile = (items: number[], q: number) => {
     sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0
   );
 };
+export const measurementRunning = () => active !== undefined;
 export function invalidateMeasurement(reason: string) {
   if (!active) return;
   active.interrupted = true;
@@ -67,6 +69,7 @@ export function beginMeasurement(
     viewport: [innerWidth, innerHeight],
     dpr: devicePixelRatio,
     canvas: scene ? [scene.renderer.domElement.width, scene.renderer.domElement.height] : [],
+    postFusion: scene?.postFusionEnabled,
     interruptions: [],
     interrupted: false,
     inputs: [],
@@ -114,6 +117,7 @@ export function sampleFrame(
     active.previous = 0;
     return;
   }
+  if (scene.postFusionEnabled !== active.postFusion) invalidateMeasurement("postfusion-changed-during-measurement");
   if (
     innerWidth !== active.viewport[0] ||
     innerHeight !== active.viewport[1] ||
@@ -214,6 +218,9 @@ export function sampleFrame(
       gpuMs:m.nativeFrames.length?summary(m.nativeFrames.map(f=>f.gpuMs)):null,
       cpuMs:m.nativeFrames.length?summary(m.nativeFrames.map(f=>f.cpuMs)):null},
     postFusionEnabled: scene.postFusionEnabled,
+    startingPostFusionEnabled: m.postFusion,
+    postFusionActive: scene.postFusionActive,
+    renderingOptimized: scene.renderingOptimized,
     transmissionDepthEnabled: scene.transmissionDepthEnabled,
     benchmarkDevicePixelRatio: scene.benchmarkDevicePixelRatio ?? null,
     interactions: m.inputs.length

@@ -1,6 +1,7 @@
 import { motionDelta } from "./motion.ts";
 import { captureForMetal } from "./metal-capture";
 import { installFusedOutput } from "./fused-output";
+import { capturePostFusionPixels, postFusionPng } from "./postfusion-validation";
 import { TransmissionPrepass } from "./transmission-prepass";
 import { GLFrameCapture } from "./gl-frame-capture";
 import { MetalController } from "./metal-controller";
@@ -1769,13 +1770,16 @@ export class ArchiveScene {
       }
     }
   }
+  get postFusionActive() {
+    return this.renderingOptimized && this.postFusionEnabled && this.bokeh.enabled
+      && !this.smaa.enabled && this.renderer.toneMapping === THREE.ACESFilmicToneMapping
+      && this.renderer.outputColorSpace === THREE.SRGBColorSpace;
+  }
   private renderCurrentFrame() {
     this.transmissionPrepass!.beginFrame();
     this.transmissionPrepass!.batch = true;
     this.transmissionPrepass!.enabled = musicLibrary && this.renderingOptimized && this.transmissionDepthEnabled;
-    const fuse = this.renderingOptimized && this.postFusionEnabled && this.bokeh.enabled
-      && !this.smaa.enabled && this.renderer.toneMapping === THREE.ACESFilmicToneMapping
-      && this.renderer.outputColorSpace === THREE.SRGBColorSpace;
+    const fuse = this.postFusionActive;
     this.output.enabled = !fuse;
     this.bokeh.materialBokeh.uniforms.rhineFusedOutput.value = fuse;
     this.bokeh.materialBokeh.uniforms.toneMappingExposure.value = this.renderer.toneMappingExposure;
@@ -1820,6 +1824,38 @@ export class ArchiveScene {
   }
   interactionPose() {
     return [...this.camera.position.toArray(),...this.cameraAim.toArray(),...this.model.position.toArray(),this.rail.value,this.columnCamera.value,this.detail];
+  }
+  validatePostFusion() {
+    if (this.nativeMetal.stats.active || this.nativeMetal.preparing || this.motionResolution.enabled
+      || this.transmissionDepthEnabled || !this.renderingOptimized || !this.bokeh.enabled
+      || this.smaa.enabled || this.renderer.toneMapping !== THREE.ACESFilmicToneMapping
+      || this.renderer.outputColorSpace !== THREE.SRGBColorSpace)
+      throw new Error("Postfusion QA requires original WebGL paths with DOF, ACES/sRGB and no SMAA");
+    const gl = this.renderer.getContext(), width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
+    const pose = this.interactionPose().concat(this.rotation);
+    const result = capturePostFusionPixels({
+      enabled: () => this.postFusionEnabled,
+      setEnabled: enabled => { this.postFusionEnabled = enabled; },
+      read: () => {
+        this.renderCurrentFrame();
+        if (gl.isContextLost() || gl.drawingBufferWidth !== width || gl.drawingBufferHeight !== height)
+          throw new Error("Postfusion readback lost context or changed dimensions");
+        const pixels = new Uint8Array(width * height * 4);
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        if (gl.getError() !== gl.NO_ERROR) throw new Error("Postfusion readback GL error");
+        return pixels;
+      },
+    });
+    return { label: `postfusion-visual-${Date.now()}`, measuredAt: new Date().toISOString(),
+      theme: this.theme, phase: this.musicPresentationPhase, pose, quality: this.quality,
+      canvas: [width, height], viewport: [innerWidth, innerHeight], devicePixelRatio,
+      benchmarkDevicePixelRatio: this.benchmarkDevicePixelRatio ?? null,
+      aa: result.aa, ab: result.ab, restored: result.restored, pixelGate: result.pixelGate,
+      restoredFlag: this.postFusionEnabled,
+      frames: result.frames.map(frame => ({name: frame.name, postFusion: frame.enabled,
+        png: postFusionPng(frame.pixels, width, height)})),
+      note: "Synchronous frozen-pose A1/A2/B/A3; same AO random state; only postFusion changes. Readback/PNG encoding perturbs load: NOT performance evidence. Pixel gate also requires human visual review.",
+    };
   }
   validateRenderingOptimization() {
     const gl = this.renderer.getContext();
