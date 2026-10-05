@@ -1,0 +1,23 @@
+[package]
+name = "rhine-metal-lab"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Offscreen Metal parity and ray intersection experiments for Rhine Music"
+
+[dependencies]
+anyhow = "1"
+metal = "0.31"
+objc = "0.2"
+glam = "0.30"
+half = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
+core-graphics-types = "0.1"
+base64 = "0.22"
+regex = "1"
+
+[profile.release]
+opt-level = 3

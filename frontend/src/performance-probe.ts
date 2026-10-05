@@ -5,6 +5,8 @@ type Sample = {
   cpu: number;
   calls: number;
   triangles: number;
+  width: number;
+  height: number;
 };
 type Input = {
   action: string;
@@ -13,6 +15,7 @@ type Input = {
   handlerMs: number;
   issuedAt: number;
   nextSubmissionMs?: number;
+  nextNativeCompletionMs?: number;
   changedPoseMs?: number;
   pose: number[];
 };
@@ -30,6 +33,7 @@ let active:
       interruptions: string[];
       interrupted: boolean;
       inputs: Input[];
+      nativeFrames: {issuedAt:number;completedAt:number;gpuMs:number;cpuMs:number}[];
       maxPending: number;
       finalState?: unknown;
     }
@@ -40,6 +44,11 @@ const percentile = (items: number[], q: number) => {
     sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0
   );
 };
+export function invalidateMeasurement(reason: string) {
+  if (!active) return;
+  active.interrupted = true;
+  if (!active.interruptions.includes(reason)) active.interruptions.push(reason);
+}
 export function beginMeasurement(
   label: string,
   seconds: number,
@@ -61,10 +70,17 @@ export function beginMeasurement(
     interruptions: [],
     interrupted: false,
     inputs: [],
+    nativeFrames: [],
     maxPending: 0,
   };
   document.documentElement.dataset.measurement = label;
   return true;
+}
+export function recordNativeCompletion(issuedAt:number,completedAt:number,gpuMs:number,cpuMs:number) {
+  if(!active)return;
+  active.nativeFrames.push({issuedAt,completedAt,gpuMs,cpuMs});
+  for(const input of active.inputs)if(issuedAt>=input.issuedAt && input.nextNativeCompletionMs===undefined)
+    input.nextNativeCompletionMs=completedAt-input.issuedAt;
 }
 export function recordInteraction(
   action: string,
@@ -107,7 +123,7 @@ export function sampleFrame(
     const change=`display: ${innerWidth}x${innerHeight}@${devicePixelRatio}, started ${active.viewport.join("x")}@${active.dpr}`;
     if(!active.interruptions.includes(change)) active.interruptions.push(change);
   }
-  if(active.canvas.length && (scene.renderer.domElement.width!==active.canvas[0] || scene.renderer.domElement.height!==active.canvas[1])) {
+  if(!scene.motionResolution.enabled && active.canvas.length && (scene.renderer.domElement.width!==active.canvas[0] || scene.renderer.domElement.height!==active.canvas[1])) {
     active.interrupted=true;
     if(!active.interruptions.includes("render-buffer-resized"))active.interruptions.push("render-buffer-resized");
   }
@@ -117,6 +133,8 @@ export function sampleFrame(
       cpu,
       calls: scene.renderer.info.render.calls,
       triangles: scene.renderer.info.render.triangles,
+      width: scene.renderer.domElement.width,
+      height: scene.renderer.domElement.height,
     });
   active.previous = now;
   if (active.inputs.length) {
@@ -164,7 +182,7 @@ export function sampleFrame(
       ? undefined
       : "Window hidden, display changed, or frame callbacks suspended; do not compare this run.",
     optimization:
-      "v4: v3 rendering plus optional fused bokeh/output and transmission depth prepass; shared cover cache and elapsed-time motion in both modes",
+      "v6: bounded painted-cover cache; Metal tile resolve fusion and whole-scene back-surface depth rejection; original quality",
     label: m.label,
     measuredAt: new Date().toISOString(),
     runtime: isNative ? "Tauri / macOS WKWebView" : "browser",
@@ -172,6 +190,8 @@ export function sampleFrame(
     viewport: m.viewport,
     devicePixelRatio: m.dpr,
     canvas: [scene.renderer.domElement.width, scene.renderer.domElement.height],
+    smoothMotion: {enabled:scene.motionResolution.enabled,endingScale:scene.motionResolution.scale,
+      sampledResolutions:[...new Set(m.samples.map(s=>`${s.width}x${s.height}`))]},
     metadata: m.metadata,
     samples: m.samples.length,
     elapsedMs: now - m.start,
@@ -189,6 +209,10 @@ export function sampleFrame(
     ),
     gpuMs: null,
     sceneStats: scene.getStats(),
+    nativeMetal: {...scene.nativeMetal.stats,frames:m.nativeFrames,
+      completedFps:m.nativeFrames.length>1 ? 1000*(m.nativeFrames.length-1)/(m.nativeFrames.at(-1)!.completedAt-m.nativeFrames[0].completedAt):null,
+      gpuMs:m.nativeFrames.length?summary(m.nativeFrames.map(f=>f.gpuMs)):null,
+      cpuMs:m.nativeFrames.length?summary(m.nativeFrames.map(f=>f.cpuMs)):null},
     postFusionEnabled: scene.postFusionEnabled,
     transmissionDepthEnabled: scene.transmissionDepthEnabled,
     benchmarkDevicePixelRatio: scene.benchmarkDevicePixelRatio ?? null,
@@ -202,6 +226,8 @@ export function sampleFrame(
               x.nextSubmissionMs === undefined ? [] : [x.nextSubmissionMs],
             ),
           ),
+          nextNativeCompletionMs: summary(m.inputs.flatMap(x=>x.nextNativeCompletionMs===undefined?[]:[x.nextNativeCompletionMs])),
+          nativeCompletionSamples:m.inputs.filter(x=>x.nextNativeCompletionMs!==undefined).length,
           maxPendingSelection: m.maxPending,
           finalState: m.finalState,
           raw: m.inputs,

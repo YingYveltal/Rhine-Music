@@ -89,6 +89,7 @@ const preferences = {
     sortMode: "genre" as MusicSortMode,
     quality: "original" as QualityPreset,
     reduced: false,
+    smoothMotion: false,
     volume: 0.65,
     songFade: true,
     bgm: true,
@@ -103,6 +104,7 @@ const preferences = {
       sortMode: MusicSortMode;
       quality: QualityPreset;
       reduced: boolean;
+      smoothMotion: boolean;
       volume: number;
       songFade: boolean;
       bgm: boolean;
@@ -1167,6 +1169,7 @@ function renderSettingsPanel() {
     <section class="panel-section"><h3>音乐库排列</h3><label class="settings-row"><span>排列方式<small>切换后自动刷新页面</small></span><select id="music-sort" aria-label="音乐库排列方式">${(["genre", "artist", "album"] as MusicSortMode[]).map((value) => `<option value="${value}" ${preferences.sortMode === value ? "selected" : ""}>${sortLabels[value].name}</option>`).join("")}</select></label><p>按歌手时，同一歌手的专辑放在同一列；按专辑名时，按拼音或字母顺序排列，每 12 张一列。</p></section>
     <section class="panel-section" id="introduction-settings"><h3>专辑介绍</h3><p>从公开百科查询并更新专辑介绍，附上资料来源。介绍保存在本机，不需要配置 MusicBrainz 联系信息；音乐文件不会上传。</p><p id="introduction-coverage"></p><button class="primary-button" id="introduction-refresh" data-action="introductions-library">查询 / 更新专辑介绍 ↗</button><progress id="introduction-progress" aria-label="专辑介绍查询进度" max="1" value="0" hidden></progress><p id="introduction-status" class="scan-status" role="status" aria-live="polite"></p><details id="introduction-missing" hidden><summary></summary><ul></ul></details></section>
     ${qualityMarkup(renderQuality)}
+    <section class="panel-section"><label class="settings-row"><span>流畅优先（实验）<small>运动时降低三维分辨率，停稳后恢复；文字、材质与动画保持原设置。开启后使用标准渲染。</small></span><input type="checkbox" id="smooth-motion" ${preferences.smoothMotion ? "checked" : ""}></label></section>
     <section class="panel-section"><h3>动效与显示</h3><label class="settings-row"><span>减少动态效果<small>简化镜头、文字加载和页签过渡</small></span><input type="checkbox" id="reduced-motion" ${preferences.reduced ? "checked" : ""}></label><button class="text-button" data-action="fullscreen">切换全屏 ↗</button></section>
     <section class="panel-section"><h3>声音</h3><label class="settings-row"><span>歌曲音量</span><input type="range" id="volume" aria-label="歌曲音量" min="0" max="100" value="${Math.round(preferences.volume * 100)}"></label><label class="settings-row"><span>切歌淡入淡出<small>当前歌曲先淡出，再淡入下一首</small></span><input type="checkbox" id="song-fade-setting" ${preferences.songFade ? "checked" : ""}></label><label class="settings-row"><span>界面音效<small>玻璃卡片与终端操作</small></span><input type="checkbox" id="sound-setting" ${preferences.sound ? "checked" : ""}></label><label class="settings-row"><span>音效音量</span><input type="range" id="sound-volume" aria-label="音效音量" min="0" max="100" value="${Math.round(preferences.soundVolume * 100)}"></label><label class="settings-row"><span>氛围 BGM<small>专辑开始前淡出，停止后淡入</small></span><input type="checkbox" id="bgm-setting" ${preferences.bgm ? "checked" : ""}></label><label class="settings-row"><span>BGM 音量</span><input type="range" id="bgm-volume" aria-label="BGM 音量" min="0" max="100" value="${Math.round(preferences.bgmVolume * 100)}"></label><button class="text-button" data-action="sound-preview">试听界面音效 ↗</button><p>${isNative ? "macOS 桌面版：Rust 负责曲库、播放、缓存及后台任务；界面使用系统 WebView 与原版 Three.js。DSF / DFF 暂不支持播放。" : "当前版本支持 macOS，使用浏览器播放本地音乐。DSF / DFF 暂不支持播放，其他格式取决于浏览器解码能力。"}</p></section>
     <section class="panel-section"><h3>开发与资源</h3><p>音乐适配与维护：<a href="https://github.com/RonaldDeng/Rhine-Music-Demo" target="_blank" rel="noopener">RonaldDeng ↗</a><br>原版界面：<a href="https://github.com/LBEILC/RhineLabUI" target="_blank" rel="noopener">LBEILC / RhineLabUI ↗</a></p><p><a href="/licenses/project-mit.txt" target="_blank" rel="noopener">代码 MIT 许可 ↗</a> · <a href="https://github.com/RonaldDeng/Rhine-Music-Demo/blob/v0.2.0/NOTICE.md" target="_blank" rel="noopener">版权与资源说明 ↗</a></p><a href="/?original=1&scene=archive" target="_blank" rel="noopener">打开原版档案界面 ↗</a><p><a href="/fonts/MiSans-license.pdf" target="_blank" rel="noopener">MiSans 字体许可 ↗</a></p></section>`;
@@ -1469,6 +1472,11 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("change", (e) => {
   const el = e.target as HTMLInputElement;
+  if(el.id === "smooth-motion") {
+    preferences.smoothMotion=el.checked;
+    void scene?.setSmoothMotion(el.checked);
+    savePrefs();
+  }
   if (el.id === "music-sort" && ["genre", "artist", "album"].includes(el.value)) {
     if (preferences.sortMode === el.value) return;
     preferences.sortMode = el.value as MusicSortMode;
@@ -1642,7 +1650,7 @@ function frame(ms: number) {
     frameCount++;
     if (ms - lastFrame > 1500) {
       $("#runtime-info").textContent =
-        `${Math.round((frameCount * 1000) / (ms - lastFrame))} FPS / ${themeNames[preferences.theme]}`;
+        `${scene.nativeMetal.preparing ? "METAL 准备中" : scene.nativeMetal.stats.active ? `METAL ${Math.round(scene.nativeMetal.stats.completedFps)} FPS` : `${Math.round((frameCount * 1000) / (ms - lastFrame))} FPS`} / ${themeNames[preferences.theme]}`;
       // Keep read-only render diagnostics alongside the existing resolution
       // attributes, without adding controls or per-frame DOM work.
       if (!viewer?.isOpen) {
@@ -1668,6 +1676,7 @@ function frame(ms: number) {
 let stressPending = false;
 window.addEventListener("keydown", (event) => {
   if (!event.ctrlKey || !event.altKey || !scene || !ready) return;
+  if(event.code === "KeyH" && scene.nativeMetal.stats.active) {event.preventDefault();void nativeInvoke("metal_profile_slow");notify("捕获下一张 GPU 长帧；本轮仅作诊断");return;}
   if(event.code === "KeyR") {event.preventDefault();scene.benchmarkDevicePixelRatio=scene.benchmarkDevicePixelRatio?undefined:2;scene.resize();notify(`Retina 负载对照：${scene.benchmarkDevicePixelRatio ? "开启" : "关闭"}`);return;}
   if(event.code === "KeyT") {event.preventDefault();scene.transmissionDepthEnabled=!scene.transmissionDepthEnabled;notify(`透射深度预计算：${scene.transmissionDepthEnabled ? "开启" : "关闭"}`);return;}
   if(event.code === "KeyF") {event.preventDefault();scene.postFusionEnabled=!scene.postFusionEnabled;notify(`后处理合并：${scene.postFusionEnabled ? "开启" : "关闭"}`);return;}
@@ -1738,6 +1747,7 @@ async function start() {
     await scene.refreshLibrary(selected);
     scene.setTheme(preferences.theme);
     scene.setQuality(renderQuality);
+    await scene.setSmoothMotion(Boolean(preferences.smoothMotion));
     scene.setReduced(preferences.reduced);
     scene.onSelect = (index, cell) => {
       if (!boot?.active && presentation.phase === "archive" && !panel)
