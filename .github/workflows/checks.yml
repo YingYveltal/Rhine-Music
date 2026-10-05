@@ -1,0 +1,42 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-checks:
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      CARGO_BUILD_JOBS: 3
+      MUSIC_NATIVE_DATA_DIR: ${{ runner.temp }}/rhine-native-test
+      MUSIC_DATA_DIR: ${{ runner.temp }}/rhine-web-test
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24.14.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - name: Install Rust
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal
+          rustup default 1.93.1
+      - name: Install locked dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+      - name: Check frontend and native code
+        run: bash scripts/check.sh
