@@ -47,6 +47,12 @@ A=postFusion 关闭，B=开启且实际兼容条件生效；其余开关相同�
 
 ## 准备阶段已检查与待资源项
 
+准备代码提交 `88f9652311c45a19631c884bdc3ab45efb62af9c` 已保存；随后以合并提交 `42052728d2b4ec3a5d30bc3edf73a52d5c85a107` 纳入总控确认的 main `ff30a9a6bd82445d926b26c0ed6ac59a9d0e6d35`。组合后 3 项画面工具逻辑检查、6 项离线比较检查与 QA 补丁 apply --check 通过。此提交仍只是准备源码，不是最终冻结的实测包。
+
+资源成本预估：独立依赖安装/首次 release 构建约 10–25 分钟（视缓存）；隔离回读和两主题画面检查约 15–25 分钟；深夜 12 轮固定预热及回放净计时 11 分 36 秒，连同复位和证据整理约 20–30 分钟。若前关失败即停止，不为失败候选预占完整矩阵；通过后的完整验收另排。上述是排期估计，不是已消耗或实测性能数据。
+
+结束时按本次启动记录的 PID 退出新 QA 进程，并验证已退出，释放设备。保留本 worktree 的原始报告、包 hash、配置和 fixture；不自动删除旧 #7 或正式用户目录。仅在本次 QA 身份内把 postFusion 恢复关闭；不改用户应用偏好。新 WK store 保留作可复核证据，后续需要删除时只针对回读确认的本次 UUID；不执行全局 WebKit/缓存清理。
+
 纯逻辑检查入口：`node --experimental-strip-types --test frontend/scripts/check-postfusion-validation.mjs`、`python3 scripts/check-postfusion-evaluation.py`。覆盖恢复开关、A/A 不稳定/色差拒绝、异常失败、5%门槛、A/A 波动及单对长尾退化拒绝；不是像素/GPU/完整 TypeScript 编译验收。
 
 待总控：核对准备提交和上述协议，交回设备/构建时段，确认最终 main；之后才安装本 worktree 依赖、构建独立包、核对 codesign/hash/实际 WK store，导入 fixture 并执行第一关。正式默认开关仍关闭；未启动 QA，未写实现 PR。
