@@ -60,3 +60,5 @@
 - Metal GUI/图像一致性、高频交互性能、“流畅优先”收益、真实 QQ 登录播放尚未重验；v2 名称分支未另行打包。标准 QQ 自动测试由本 PR 的 macOS CI 执行，最终运行状态以 PR 检查页为准。
 
 构建成功只证明可编译/打包，不代表 QQ 真实登录播放、Metal 图像一致性或流畅度验收。
+
+默认 QQ GUI 补验结果见 [rendering-default-qa.md](rendering-default-qa.md)：Q1/Q2/Q3/Q2b 已执行；Q4 部分、Q5/Q6 尚未完成，Mac 锁屏中断，测试 app 已退出。该隔离 harness 的视觉回归结果不替代本节尚缺的性能、Metal 或真实 QQ 验收。

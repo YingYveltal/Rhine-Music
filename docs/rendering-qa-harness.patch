@@ -1,0 +1,51 @@
+diff --git a/src-tauri/src/main.rs b/src-tauri/src/main.rs
+index cafed01..ecc16a8 100644
+--- a/src-tauri/src/main.rs
++++ b/src-tauri/src/main.rs
+@@ -517,10 +517,34 @@ fn assets(app: &tauri::App) -> PathBuf {
+         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../frontend/public")
+     }
+ }
++// QA-only readback: verify the actual WKWebView uses the requested store.
++#[link(name = "objc")]
++extern "C" {
++    fn sel_registerName(name: *const std::ffi::c_char) -> *mut std::ffi::c_void;
++    #[link_name = "objc_msgSend"]
++    fn qa_message(receiver: *mut std::ffi::c_void, selector: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
++}
++unsafe fn qa_store_identifier(mut object: *mut std::ffi::c_void) -> String {
++    for name in [c"configuration", c"websiteDataStore", c"identifier", c"UUIDString", c"UTF8String"] {
++        object = qa_message(object, sel_registerName(name.as_ptr()));
++        if object.is_null() { return "MISSING".into(); }
++    }
++    std::ffi::CStr::from_ptr(object.cast()).to_string_lossy().into_owned()
++}
++
+ fn main() {
+     tauri::Builder::default()
+         .plugin(tauri_plugin_opener::init())
+         .setup(|app| {
++            let qa_window = tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?
++                .data_store_identifier([200, 134, 209, 246, 132, 131, 77, 249, 155, 208, 200, 104, 138, 172, 238, 5])
++                .build()?;
++            qa_window.with_webview(|view| {
++                let actual = unsafe { qa_store_identifier(view.inner()) };
++                eprintln!("RHINE_QA_STORE={actual}");
++                assert_eq!(actual, "C886D1F6-8483-4DF9-9BD0-C8688AACEE05", "QA datastore isolation failed");
++            })?;
++
+             let data = std::env::var_os("MUSIC_NATIVE_DATA_DIR")
+                 .map(PathBuf::from)
+                 .unwrap_or(app.path().app_data_dir()?);
+@@ -551,6 +575,10 @@ fn main() {
+             open_link,
+             toggle_fullscreen
+         ])
+-        .run(tauri::generate_context!())
++        .run({
++            let mut context = tauri::generate_context!();
++            context.config_mut().app.windows[0].create = false;
++            context
++        })
+         .expect("Rhine Music failed to launch");
+ }
