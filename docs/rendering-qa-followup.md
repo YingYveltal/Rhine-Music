@@ -64,3 +64,5 @@ f0551fc 本地：新增回归先红后绿，14 项渲染检查通过；9 项 QQ 
 收尾通过普通 UI 恢复按流派并重载页面；`restored-settings` 确认原始画质、smoothMotion=0、reduced=0、界面音效/BGM=0。诊断覆盖此前关闭且页面重载重置。Cmd+Q 退出自身 PID 24028 后核对进程已不存在、无 remember-connection，资源交回总控。没有真实账户、媒体播放或存储迁移操作。
 
 代码及前期证据提交 `3aa386f` 的 [macOS CI 已通过](https://github.com/YingYveltal/Rhine-Music/actions/runs/37324678369)。本次仅追加文档与本地证据哈希，后续文档提交的 CI 以 PR Checks 为准。Q4/Q5 的上述有限检查完成；Q6、纯 hover/leave、触摸/笔、真实 QQ 和完整性能/Metal 验收的边界不变。
+
+GUI 收尾后又通过 `c09847b` 合入 main `e0ea33cb1e71a7ffdd935fb4546e9784e0b9517f`（PR #17）。这次主线增量仅为 audio.rs 及 transport_tests.rs；已核对 frontend、main.rs、Tauri 配置和 Cargo 清单/锁相对 f0551fc 无差异。因此没有重新打包或重复 GUI，GUI 证据仍明确绑定 f0551fc。新增音频修复由 PR #17 及最终组合 CI 的 transport 自动测试覆盖，未进行真实音源联合验收。
