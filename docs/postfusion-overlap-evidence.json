@@ -1,0 +1,389 @@
+{
+  "sourceCommit": "8f09303ee767ff9eeb7e206a438745f3fa7bab0f",
+  "pid": 39302,
+  "status": "stopped-at-tool-state-rejection-no-retry-no-performance",
+  "note": "Host wall-clock API call timestamps, not DOM event delivery or GPU time. Trial 5 Down call rejected with application state changed; fresh read remained QA02, no Y sent.",
+  "calls": [
+    {
+      "theme": "day",
+      "ms": 350,
+      "inputStart": 1791216855911,
+      "inputEnd": 1791216855932,
+      "yStart": 1791216856264,
+      "yEnd": 1791216856279,
+      "status": "captured",
+      "report": "data-final/benchmarks/20261005-161416-postfusion-visual-1791216856503.json",
+      "sha256": "b71b626a4d455ede00cfe4cb2a01ef0ec6962f2f3174820132e377a8d6bca854",
+      "actualYAfterInputStartMs": 353,
+      "frames": [
+        {
+          "name": "A1",
+          "file": "visual/20261005-161416-postfusion-visual-1791216856503-A1.png",
+          "sha256": "ecc3c5fdd837093a5d8f618537a72520effb4c16dbd470cb5b1e9e9745618349"
+        },
+        {
+          "name": "A2",
+          "file": "visual/20261005-161416-postfusion-visual-1791216856503-A2.png",
+          "sha256": "ecc3c5fdd837093a5d8f618537a72520effb4c16dbd470cb5b1e9e9745618349"
+        },
+        {
+          "name": "B",
+          "file": "visual/20261005-161416-postfusion-visual-1791216856503-B.png",
+          "sha256": "aa4090c533852c700fd907696c6370adb38d90d1d94df63be3ba2847223bd6ae"
+        },
+        {
+          "name": "A3",
+          "file": "visual/20261005-161416-postfusion-visual-1791216856503-A3.png",
+          "sha256": "ecc3c5fdd837093a5d8f618537a72520effb4c16dbd470cb5b1e9e9745618349"
+        }
+      ],
+      "phase": "presented",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        1.0737141824997174,
+        -2.1699999999999995,
+        -0.6199999999999996,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "pixelGate": true,
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.00567334587191358
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "restoredFlag": false
+    },
+    {
+      "theme": "day",
+      "ms": 430,
+      "inputStart": 1791216894561,
+      "inputEnd": 1791216894569,
+      "yStart": 1791216894991,
+      "yEnd": 1791216895001,
+      "status": "captured",
+      "report": "data-final/benchmarks/20261005-161455-postfusion-visual-1791216895196.json",
+      "sha256": "31c420432e291bd24f639e601c8f0554834200be3ea5964d4ed213bafd23691d",
+      "actualYAfterInputStartMs": 430,
+      "frames": [
+        {
+          "name": "A1",
+          "file": "visual/20261005-161455-postfusion-visual-1791216895196-A1.png",
+          "sha256": "6e42bcb4777529829f7be9a0c4ba9864df45a5f1bb898534c4c90811b7ddec22"
+        },
+        {
+          "name": "A2",
+          "file": "visual/20261005-161455-postfusion-visual-1791216895196-A2.png",
+          "sha256": "6e42bcb4777529829f7be9a0c4ba9864df45a5f1bb898534c4c90811b7ddec22"
+        },
+        {
+          "name": "B",
+          "file": "visual/20261005-161455-postfusion-visual-1791216895196-B.png",
+          "sha256": "4198102b6531e1b84086f704d2e8760f8e0f31bc84bfe8e5c1967f2fe8cafaac"
+        },
+        {
+          "name": "A3",
+          "file": "visual/20261005-161455-postfusion-visual-1791216895196-A3.png",
+          "sha256": "6e42bcb4777529829f7be9a0c4ba9864df45a5f1bb898534c4c90811b7ddec22"
+        }
+      ],
+      "phase": "placing",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        -0.6566572173773726,
+        -1.864380289522129,
+        -0.934380289522129,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "pixelGate": true,
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.005892650462962963
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "restoredFlag": false
+    },
+    {
+      "theme": "day",
+      "ms": 510,
+      "inputStart": 1791216952833,
+      "inputEnd": 1791216952844,
+      "yStart": 1791216953345,
+      "yEnd": 1791216953352,
+      "status": "captured",
+      "report": "data-final/benchmarks/20261005-161553-postfusion-visual-1791216953557.json",
+      "sha256": "a9a212c20d88f3e3107b789fc9c3fb24617a9d5466806fa8d71b03e69c6e801f",
+      "actualYAfterInputStartMs": 512,
+      "frames": [
+        {
+          "name": "A1",
+          "file": "visual/20261005-161553-postfusion-visual-1791216953557-A1.png",
+          "sha256": "6c88136eecabff144a7e224f1eecd138fd01c158cf2f215408e3c5dbe3a1b5ba"
+        },
+        {
+          "name": "A2",
+          "file": "visual/20261005-161553-postfusion-visual-1791216953557-A2.png",
+          "sha256": "6c88136eecabff144a7e224f1eecd138fd01c158cf2f215408e3c5dbe3a1b5ba"
+        },
+        {
+          "name": "B",
+          "file": "visual/20261005-161553-postfusion-visual-1791216953557-B.png",
+          "sha256": "9dff1d3e7d4ce22347a7925c250eb73c6bf93571ce5f55eb909df8e068a684ca"
+        },
+        {
+          "name": "A3",
+          "file": "visual/20261005-161553-postfusion-visual-1791216953557-A3.png",
+          "sha256": "6c88136eecabff144a7e224f1eecd138fd01c158cf2f215408e3c5dbe3a1b5ba"
+        }
+      ],
+      "phase": "placing",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        0.09075843382952264,
+        -1.9955332772764345,
+        -1.0655332772764343,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "pixelGate": true,
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.0055844907407407406
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "restoredFlag": false
+    },
+    {
+      "theme": "night",
+      "ms": 350,
+      "inputStart": 1791216996309,
+      "inputEnd": 1791216996318,
+      "yStart": 1791216996660,
+      "yEnd": 1791216996670,
+      "status": "captured",
+      "report": "data-final/benchmarks/20261005-161636-postfusion-visual-1791216996865.json",
+      "sha256": "31204f544abb8f84e478418a71300b57f3552c3475e454d642c6a74e489d74bd",
+      "actualYAfterInputStartMs": 351,
+      "frames": [
+        {
+          "name": "A1",
+          "file": "visual/20261005-161636-postfusion-visual-1791216996865-A1.png",
+          "sha256": "8eedaec438adfce2e2c90a0bcc1f9b21698d9f5ab7234ab612b53c668cd08f1c"
+        },
+        {
+          "name": "A2",
+          "file": "visual/20261005-161636-postfusion-visual-1791216996865-A2.png",
+          "sha256": "8eedaec438adfce2e2c90a0bcc1f9b21698d9f5ab7234ab612b53c668cd08f1c"
+        },
+        {
+          "name": "B",
+          "file": "visual/20261005-161636-postfusion-visual-1791216996865-B.png",
+          "sha256": "648758d608d5c25a9e9f30a69ecfd5cadf9782e90d327ad83b50113e57f5d1c4"
+        },
+        {
+          "name": "A3",
+          "file": "visual/20261005-161636-postfusion-visual-1791216996865-A3.png",
+          "sha256": "8eedaec438adfce2e2c90a0bcc1f9b21698d9f5ab7234ab612b53c668cd08f1c"
+        }
+      ],
+      "phase": "placing",
+      "pose": [
+        -6.814251713870561,
+        27.651834621626328,
+        65.15736457114976,
+        2.6019036769821713,
+        3.0263843021781778,
+        -1.8420623981886204,
+        0,
+        -1.6532098540816,
+        -1.6910609408256203,
+        -0.7610609408256206,
+        -10.4,
+        1,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "viewport": [
+        1920,
+        1080
+      ],
+      "devicePixelRatio": 1,
+      "benchmarkDevicePixelRatio": null,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "pixelGate": true,
+      "aa": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "ab": {
+        "fractionAboveTwo": 0,
+        "maximum": 1,
+        "mean": 0.004690393518518518
+      },
+      "restored": {
+        "fractionAboveTwo": 0,
+        "maximum": 0,
+        "mean": 0
+      },
+      "restoredFlag": false
+    },
+    {
+      "theme": "night",
+      "ms": 430,
+      "status": "tool-state-rejection-before-Down-ack-no-Y-no-report"
+    },
+    {
+      "theme": "night",
+      "ms": 510,
+      "status": "not-attempted-stopped-after-tool-rejection"
+    }
+  ],
+  "baselineCommit": "ff30a9a6bd82445d926b26c0ed6ac59a9d0e6d35",
+  "packageSha256": "5973873a9aba168532deaa4aeaa3876be2fff4466423347120ea44745c5dee3a",
+  "executableSha256": "318267244e59b38a67bbcf5f062dd68a5f20d05244111a6cf92e193c282babb9",
+  "artifactRoot": ".local/postfusion-qa",
+  "artifacts": [
+    {
+      "file": "overlap-evidence.json",
+      "sha256": "6166f0a661a45ddcfa5513cff015abc3fec247b321f24389881b43323be05e22"
+    },
+    {
+      "file": "launch-overlap.json",
+      "sha256": "44828bcad62ae7c182057b848f3bd9d5af292711b05bb2cc6bd612f122497b50"
+    },
+    {
+      "file": "launch-overlap.log",
+      "sha256": "e3e46eec2b2a73b610e0c50f71846a1d33129ed7db515bce6c18439a3f2208b1"
+    }
+  ],
+  "visualCoverage": "partial-overlap-identities-not-both-unambiguously-readable; no performance run"
+}
