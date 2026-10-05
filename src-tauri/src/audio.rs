@@ -196,7 +196,9 @@ fn run_transport(
                     pending = None;
                     phase = 0;
                     gain = 1.0;
-                    if !sink.empty() {
+                    // stop() drains on the output callback. A discarded source
+                    // must not be resumed while those final samples are pending.
+                    if loaded_track.is_some() && !sink.empty() {
                         if sink.is_paused() {
                             sink.play();
                             state.lock().unwrap().transport = "playing".into();

@@ -108,7 +108,8 @@ fn paused_source_resumes_and_clears_a_previous_error() {
     let a = wav(dir.path(), "a", 80000);
     let player = Transport::new(None);
     player.play(&[a.clone()], 0);
-    player.playing("a");
+    let loaded = player.playing("a").track.unwrap();
+    assert!(loaded.duration > 0.0);
     let mut output = player.output();
     consume(&mut output, 2000);
     let position = player.wait(|s| s.elapsed > 0.1).elapsed;
@@ -120,7 +121,8 @@ fn paused_source_resumes_and_clears_a_previous_error() {
     let state = player.playing("a");
     assert!(state.error.is_none());
     assert!(state.elapsed >= position);
-    assert_eq!(state.track.unwrap().duration, 10.0);
+    // Preserve the actual decoder metadata; WAV decoder accuracy is separate.
+    assert_eq!(state.track.unwrap().duration, loaded.duration);
     assert!(player.outputs.is_empty());
 }
 
@@ -148,38 +150,44 @@ fn ordinary_switch_keeps_fade_and_automatic_queue_order() {
 
 #[test]
 fn cancelling_a_pending_switch_from_paused_a_can_load_a_again() {
-    let dir = tempfile::tempdir().unwrap();
-    let a = wav(dir.path(), "a", 80000);
-    let b = Track { id: "qq-b".into(), browser_playable: true, ..Default::default() };
-    let (started_tx, started) = crossbeam_channel::bounded(1);
-    let (release, gate) = crossbeam_channel::bounded(1);
-    let (finished_tx, finished) = crossbeam_channel::bounded(1);
-    let resolver: Resolver = Arc::new(move |_, token, version| {
-        started_tx.send(()).unwrap();
-        gate.recv_timeout(Duration::from_secs(3)).unwrap();
-        finished_tx.send(token.load(Ordering::SeqCst) != version).unwrap();
-        anyhow::bail!("obsolete B failure")
-    });
-    let player = Transport::new(Some(resolver));
-    player.play(&[a.clone(), b.clone()], 0);
-    player.playing("a");
-    let _a_output = player.output();
-    player.send(Command::Toggle);
-    player.wait(|s| s.transport == "paused");
-    player.play(&[a.clone(), b], 1);
-    started.recv_timeout(Duration::from_secs(3)).unwrap();
-    player.send(Command::Toggle); // Pause while B's resolver is pending.
-    player.wait(|s| s.transport == "paused");
-    player.play(&[a], 0);
-    player.playing("a");
-    let _reloaded_a_output = player.output();
-    release.send(()).unwrap();
-    assert!(finished.recv_timeout(Duration::from_secs(3)).unwrap());
-    player.send(Command::Toggle);
-    let state = player.wait(|s| s.transport == "paused");
-    assert_eq!(state.track.unwrap().id, "a");
-    assert!(state.error.is_none());
-    assert!(player.outputs.is_empty());
+    for drain_before_cancel in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let a = wav(dir.path(), "a", 80000);
+        let b = Track { id: "qq-b".into(), browser_playable: true, ..Default::default() };
+        let (started_tx, started) = crossbeam_channel::bounded(1);
+        let (release, gate) = crossbeam_channel::bounded(1);
+        let (finished_tx, finished) = crossbeam_channel::bounded(1);
+        let resolver: Resolver = Arc::new(move |_, token, version| {
+            started_tx.send(()).unwrap();
+            gate.recv_timeout(Duration::from_secs(3)).unwrap();
+            finished_tx.send(token.load(Ordering::SeqCst) != version).unwrap();
+            anyhow::bail!("obsolete B failure")
+        });
+        let player = Transport::new(Some(resolver));
+        player.play(&[a.clone(), b.clone()], 0);
+        player.playing("a");
+        let mut a_output = player.output();
+        player.send(Command::Toggle);
+        player.wait(|s| s.transport == "paused");
+        player.play(&[a.clone(), b], 1);
+        started.recv_timeout(Duration::from_secs(3)).unwrap();
+        // A device normally consumes these samples after stop(). Cover both
+        // callback orderings so cancellation cannot revive a discarded source.
+        if drain_before_cancel { consume(&mut a_output, 1000); }
+        player.send(Command::Toggle); // Pause while B's resolver is pending.
+        player.wait(|s| s.transport == "paused" && !s.playing);
+        if !drain_before_cancel { consume(&mut a_output, 1000); }
+        player.play(&[a], 0);
+        player.playing("a");
+        let _reloaded_a_output = player.output();
+        release.send(()).unwrap();
+        assert!(finished.recv_timeout(Duration::from_secs(3)).unwrap());
+        player.send(Command::Toggle);
+        let state = player.wait(|s| s.transport == "paused");
+        assert_eq!(state.track.unwrap().id, "a");
+        assert!(state.error.is_none());
+        assert!(player.outputs.is_empty());
+    }
 }
 
 #[test]
