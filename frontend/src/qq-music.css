@@ -1,0 +1,16 @@
+#qq-connection { margin-top:0; padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--line, #aaa5); }
+#qq-status { white-space:pre-line; font-variant-numeric:tabular-nums; }
+#qq-connection details { margin-top:16px; }
+#qq-connection summary { cursor:pointer; }
+#qq-connection button:disabled { opacity:.45; cursor:wait; }
+.qq-search { display:flex; gap:8px; margin-top:16px; }
+.qq-search input { min-width:0; flex:1; }
+#qq-qr { padding:18px; text-align:center; }
+#qq-qr img { border:10px solid white; background:white; }
+#qq-feedback:empty { display:none; }
+.qq-transport { display:flex; gap:8px; align-items:center; font-variant-numeric:tabular-nums; }
+.qq-transport input { width:104px; accent-color:currentColor; }
+.qq-transport button { font-size:17px; }
+.qq-transport small { min-width:74px; font-size:10px; }
+@media(max-width:1000px) { .qq-transport input { width:55px; } .qq-transport small { display:none; } }
+@media(max-width:720px) { .qq-transport { display:none; } }

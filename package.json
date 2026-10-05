@@ -1,0 +1,11 @@
+{
+  "name": "rhine-music-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "build": "npm --prefix frontend run build",
+    "dev": "npm --prefix frontend run dev"
+  },
+  "devDependencies": { "@tauri-apps/cli": "^2.0.0" }
+}

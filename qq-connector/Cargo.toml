@@ -1,0 +1,23 @@
+[package]
+name = "rhine-qq-connector"
+version = "0.1.0"
+edition = "2021"
+description = "Isolated QQ Music official gateway and read-only macOS library adapter"
+license = "MIT"
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls", "cookies"] }
+anyhow = "1"
+base64 = "0.22"
+regex = "1"
+chrono = "0.4"
+uuid = { version = "1", features = ["v4"] }
+rusqlite = "0.32"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+# Deliberately independent from src-tauri and metal-lab during concurrent work.
+[workspace]

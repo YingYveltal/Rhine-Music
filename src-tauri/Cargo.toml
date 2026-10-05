@@ -1,0 +1,37 @@
+[package]
+name = "rhine-music-desktop"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rhine Music desktop: Rust core and original Three.js interface"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "devtools"] }
+tauri-plugin-opener = "2"
+anyhow = "1"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+crossbeam-channel = "0.5"
+lofty = "0.22"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rodio = { version = "0.20", features = ["symphonia-aac", "symphonia-alac", "symphonia-isomp4", "symphonia-mp3", "symphonia-flac", "symphonia-wav", "symphonia-aiff"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+security-framework = "3.7"
+unicode-normalization = "0.1"
+rhine-qq-connector = { path = "../qq-connector" }
+
+[dev-dependencies]
+tempfile = "3"
+hound = "3.5"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

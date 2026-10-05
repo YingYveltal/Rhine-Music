@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Rhine Music QQ",
+  "version": "0.1.0",
+  "identifier": "com.rhine.music.qq",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Rhine Music · QQ",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 640,
+        "minHeight": 500,
+        "backgroundColor": "#eae5e1"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' data:; media-src 'self' asset: http://asset.localhost blob:; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost blob: data:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app"
+    ],
+    "resources": {
+      "../frontend/public/audio/": "audio/",
+      "../LICENSE": "LICENSE",
+      "../NOTICE.md": "NOTICE.md"
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": "-"
+    },
+    "shortDescription": "Rust 本地核心与原版 Three.js 界面；使用系统 WebView",
+    "icon": [
+      "icons/icon.png"
+    ]
+  }
+}
