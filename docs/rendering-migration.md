@@ -47,12 +47,16 @@
 
 ## 本次验证
 
-2026-10-05，在本分支独立 worktree 执行：
+2026-10-05，在本分支独立 worktree 执行。已同步主线 `574c6f5`；完整 app 对应源码提交 `1a684dd`，后续仅补充本文验证记录。环境为 macOS 26.3.1 arm64、Node 24.14.0、Cargo 1.93.1。
 
 - 根目录与前端 `npm ci` 成功；前端 `npm run build`（TypeScript/Vite/PWA）、`check:music`、`check:content`、`check:viewport` 全部通过。首次音乐检查早于依赖安装完成而缺包失败，安装完成后的正式检查通过。
 - 在 frontend 执行 `node --experimental-transform-types --test scripts/check-motion-resolution.mjs scripts/check-transmission-prepass.mjs scripts/check-cover-print-cache.mjs scripts/check-metal-data.mjs scripts/check-instance-visibility.mjs scripts/check-cover-cache.mjs`：13/13 通过。其中封面测试使用模拟 Canvas，验证复用/释放，不验证像素或真实 GPU 上传。
 - 本地独立 CARGO_HOME/CARGO_TARGET_DIR 下，`scripts/cargo.sh check --offline --locked --manifest-path metal-lab/Cargo.toml --all-targets` 通过。为避开网络重试，把现有公共 crate registry 复制进 worktree 缓存，未复制 Cargo 凭据/配置，未复用旧 target；仅检查而未执行 GPU 工具。
 - Python 构建/参考翻译脚本语法检查通过。32 个迁入文件与冻结哈希逐项比对，仅构建适配及 README 有有意差异；QQ 契约/配置文件无 diff。
-- 完整实验应用构建待补充。Metal GUI/图像一致性、高频交互性能、“流畅优先”收益、真实 QQ 登录播放尚未重验。
+- `CARGO_NET_OFFLINE=true python3 scripts/build-metal.py` 成功生成 `releases/metal/Rhine Music Metal Preview.app`，从本 worktree 独立 target 完整编译；`codesign --verify --deep --strict` 通过。主程序 SHA-256：`c6e4f848b92b7e2f9841fd88978de35999837d2fe27b366a2c920254605f0d46`。仅本地保留产物，不随 PR 上传；没有启动应用。
+- 实验生成副本的 QQ native.ts/qq.rs/audio.rs 与源文件一致，Metal 命令仅注入副本，npm 依赖链接均指向当前 worktree。22 个 QQ/config/native 文件与 origin/main 完全一致。
+- 原有 bokeh 检查通过：10,000 个随机 HDR 邻域的数学结果与 41 taps 参考在 1e-12 内一致。它不是整场景视觉验收。
+- 已知构建警告：Vite 大 chunk、旧 objc 宏 unexpected cfg 和实验工具未使用符号；未为迁移扩大修改范围。
+- Metal GUI/图像一致性、高频交互性能、“流畅优先”收益、真实 QQ 登录播放尚未重验；v2 名称分支未另行打包。标准 QQ 自动测试由本 PR 的 macOS CI 执行，最终运行状态以 PR 检查页为准。
 
 构建成功只证明可编译/打包，不代表 QQ 真实登录播放、Metal 图像一致性或流畅度验收。
