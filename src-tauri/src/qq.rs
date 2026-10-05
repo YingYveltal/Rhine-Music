@@ -105,8 +105,14 @@ impl Qq {
         });Ok(())
     }
     fn sync_inner(&self,web:&WebClient,generation:u64)->Result<usize>{
-        let directory=web.directory()?;let created=directory["mydiss"]["list"].as_array().context("歌单目录缺失")?;
+        let directory=web.directory()?;
         let collected=web.collections(false)?;let albums=web.collections(true)?;
+        self.sync_entries(generation,&directory,&collected,&albums,|id,liked|web.playlist(id,liked),|mid|web.album(mid))
+    }
+    // Keep staging and the single final commit shared by HTTP and fixture reads.
+    fn sync_entries(&self,generation:u64,directory:&Value,collected:&[Value],albums:&[Value],
+        mut playlist:impl FnMut(u64,bool)->Result<Value>,mut album_tracks:impl FnMut(&str)->Result<Vec<Value>>)->Result<usize>{
+        let created=directory["mydiss"]["list"].as_array().context("歌单目录缺失")?;
         let mut entries=vec![("liked".to_string(),"我喜欢".to_string(),true,String::new())];
         let mut seen=HashSet::new();
         for item in created.iter().chain(collected.iter()) {
@@ -117,7 +123,7 @@ impl Qq {
         let total=entries.len()+albums.len();let mut next=Saved{enabled:true,updated:timestamp(),..Default::default()};
         for (i,(id,name,liked,cover)) in entries.iter().enumerate(){
             self.connection.if_account_current(generation,||{*self.job.lock().unwrap()=json!({"running":true,"completed":i,"total":total,"message":format!("正在同步 {name}")});Ok(())})?;
-            let result=web.playlist(if *liked{0}else{id.parse()?},*liked)?;let tracks=result["tracks"].as_array().context("歌曲列表缺失")?;
+            let result=playlist(if *liked{0}else{id.parse()?},*liked)?;let tracks=result["tracks"].as_array().context("歌曲列表缺失")?;
             let a_id=format!("qq-playlist-{id}");let c=self.cover(&a_id,if cover.is_empty(){result["cover"].as_str().unwrap_or("")}else{cover},tracks.first());
             let (album,songs)=make_album(&a_id,name,"qq-playlists",tracks,c);next.albums.push(album);next.songs.extend(songs);
             std::thread::sleep(Duration::from_millis(180));
@@ -125,7 +131,7 @@ impl Qq {
         for (i,a) in albums.iter().enumerate(){
             let mid=a["albummid"].as_str().context("专辑编号缺失")?;let name=a["albumname"].as_str().unwrap_or("QQ 专辑");
             self.connection.if_account_current(generation,||{*self.job.lock().unwrap()=json!({"running":true,"completed":entries.len()+i,"total":total,"message":format!("正在同步 {name}")});Ok(())})?;
-            let tracks=web.album(mid)?;let id=format!("qq-album-{mid}");let c=self.cover(&id,a["pic"].as_str().unwrap_or(""),tracks.first());
+            let tracks=album_tracks(mid)?;let id=format!("qq-album-{mid}");let c=self.cover(&id,a["pic"].as_str().unwrap_or(""),tracks.first());
             let (album,songs)=make_album(&id,name,"qq-albums",&tracks,c);next.albums.push(album);next.songs.extend(songs);
         }
         self.connection.if_account_current(generation,||{atomic_json(&self.root.join("library.json"),&next)?;*self.saved.lock().unwrap()=next;Ok(total)})
@@ -277,3 +283,7 @@ fn make_album(id:&str,name:&str,genre:&str,raw:&[Value],cover:Option<Cover>)->(A
         println!("QQ live integration: full library, two full-length AAC decodes, pause/seek/resume, rapid switching, queue advance and stop passed.");
     }
 }
+
+#[cfg(test)]
+#[path = "qq/album_sync_tests.rs"]
+mod album_sync_tests;

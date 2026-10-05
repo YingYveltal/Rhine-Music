@@ -125,13 +125,7 @@ impl WebClient {
         }bail!("收藏目录超过本次分页上限")
     }
     pub fn album(&self,mid:&str)->Result<Vec<Value>>{
-        let mut tracks=Vec::new();for _ in 0..40 {
-            let d=self.rpc("music.musichallAlbum.AlbumSongList","GetAlbumSongList",json!({"albumMid":mid,"begin":tracks.len(),"num":100,"order":2}),true)?;
-            let items=d["songList"].as_array().context("专辑曲目列表缺失")?;
-            for t in items {tracks.push(if t["songInfo"].is_object(){t["songInfo"].clone()}else{t.clone()})}
-            let total=d["totalNum"].as_u64().context("专辑曲目总数缺失")? as usize;
-            if tracks.len()>=total {return Ok(tracks)};if items.is_empty(){bail!("专辑曲目未取全")}
-        }bail!("专辑分页上限")
+        collect_album(|begin| self.rpc("music.musichallAlbum.AlbumSongList","GetAlbumSongList",json!({"albumMid":mid,"begin":begin,"num":100,"order":2}),true))
     }
     pub fn song(&self,mid:&str)->Result<Value>{
         if mid.is_empty()||!mid.bytes().all(|b|b.is_ascii_alphanumeric()){bail!("这首歌没有可查询的 QQ 歌曲编号")}
@@ -148,6 +142,34 @@ impl WebClient {
         let url=base.join(path).map_err(|_|anyhow::anyhow!("音频地址无效"))?;if !audio_host(&url){bail!("音频服务器不受支持")};Ok(url)
     }
 }
+/// Read a complete album in service order, retaining each song occurrence.
+/// The fetch boundary lets callers exercise the same pagination without HTTP.
+pub fn collect_album(mut fetch: impl FnMut(usize) -> Result<Value>) -> Result<Vec<Value>> {
+    let mut tracks = Vec::new();
+    let mut expected = None;
+    for _ in 0..40 {
+        let data = fetch(tracks.len())?;
+        let items = data["songList"].as_array().context("专辑曲目列表缺失")?;
+        let total = data["totalNum"].as_u64().context("专辑曲目总数缺失")?;
+        if expected.is_some_and(|count| count != total) {
+            bail!("专辑读取期间总数发生变化，请重新同步")
+        }
+        expected = Some(total);
+        for item in items {
+            tracks.push(if item["songInfo"].is_object() { item["songInfo"].clone() } else { item.clone() });
+        }
+        let received = tracks.len() as u64;
+        if received > total {
+            bail!("专辑曲目数量不一致（{received}/{total}），请重新同步")
+        }
+        if received == total { return Ok(tracks) }
+        if items.is_empty() {
+            bail!("专辑曲目未取全（{received}/{total}），请重新同步")
+        }
+    }
+    bail!("专辑分页上限，请重新同步")
+}
+
 pub fn audio_host(url:&Url)->bool {url.scheme()=="https"&&url.username().is_empty()&&url.password().is_none()&&url.host_str().is_some_and(|h|h=="qq.com"||h.ends_with(".qq.com"))}
 
 enum QrReply { Waiting, Confirming, Expired, Cancelled, Ready(String) }
@@ -213,3 +235,7 @@ fn oauth_code(location:&str)->Result<String> {
         println!("Rust OAuth established a fresh QQ Music session from graph authorization and read the personal directory.");
     }
 }
+
+#[cfg(test)]
+#[path = "web/album_tests.rs"]
+mod album_tests;
