@@ -1,0 +1,24 @@
+{
+  "productName": "Rhine Music Preview",
+  "identifier": "com.rhine.music.preview",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Rhine Music Preview",
+        "create": false,
+        "width": 1280,
+        "height": 820,
+        "minWidth": 640,
+        "minHeight": 500,
+        "backgroundColor": "#eae5e1"
+      }
+    ]
+  },
+  "bundle": {
+    "macOS": {
+      "minimumSystemVersion": "14.0",
+      "signingIdentity": "-"
+    }
+  }
+}

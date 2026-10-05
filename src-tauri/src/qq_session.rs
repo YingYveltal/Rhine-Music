@@ -17,13 +17,16 @@ pub(crate) trait CredentialStore: Send {
 }
 
 pub(crate) struct Keychain;
-const SERVICE: &str = "com.rhine.music.qq";
+#[cfg(not(feature = "preview"))]
+fn service() -> &'static str { "com.rhine.music.qq" }
+#[cfg(feature = "preview")]
+fn service() -> &'static str { crate::preview::identity().0 }
 const ACCOUNT: &str = "connection";
 
 impl CredentialStore for Keychain {
     fn load(&mut self) -> Result<Option<Credentials>> {
         use security_framework::passwords::{generic_password, PasswordOptions};
-        match generic_password(PasswordOptions::new_generic_password(SERVICE, ACCOUNT)) {
+        match generic_password(PasswordOptions::new_generic_password(service(), ACCOUNT)) {
             Ok(bytes) => serde_json::from_slice(&bytes).map(Some)
                 .map_err(|_| anyhow::anyhow!("保存的连接格式无效，请重新扫码")),
             Err(error) if error.code() == -25300 => Ok(None),
@@ -31,11 +34,11 @@ impl CredentialStore for Keychain {
         }
     }
     fn save(&mut self, credentials: &Credentials) -> Result<()> {
-        security_framework::passwords::set_generic_password(SERVICE, ACCOUNT, &serde_json::to_vec(credentials)?)
+        security_framework::passwords::set_generic_password(service(), ACCOUNT, &serde_json::to_vec(credentials)?)
             .map_err(|_| anyhow::anyhow!("无法保存钥匙串，请检查系统授权后重试"))
     }
     fn delete(&mut self) -> Result<()> {
-        match security_framework::passwords::delete_generic_password(SERVICE, ACCOUNT) {
+        match security_framework::passwords::delete_generic_password(service(), ACCOUNT) {
             Ok(()) => Ok(()),
             Err(error) if error.code() == -25300 => Ok(()),
             Err(_) => bail!("本次连接已断开，但钥匙串尚未删除；请检查系统授权后再次忘记连接"),

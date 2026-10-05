@@ -31,7 +31,9 @@ npm run tauri -- build --bundles app
 
 ## 开发入口
 
-GitHub Issue 记录目标、范围和验收条件；每项需求使用独立分支与工作目录，经 PR 交付并合回 main。项目职责和验收规则见 [AGENTS.md](AGENTS.md)。原生版仍有尚未验收的渲染成果，迁移到单独 Issue 分支，不混入初始 QQ 基线。
+GitHub Issue 记录目标、范围和验收条件；每项需求使用独立分支与工作目录，经 PR 交付并合回 main。项目职责和验收规则见 [AGENTS.md](AGENTS.md) 与 [开发与验收入口](docs/DEVELOPMENT.md)。已验收的默认渲染与 QQ 修复现已纳入统一主线；未合并实验继续留在独立 Issue 分支。
+
+独立 macOS 试用包的使用与构建见 [Preview 说明](docs/PREVIEW.md)。
 
 ## 来源
 

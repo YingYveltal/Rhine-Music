@@ -5,6 +5,9 @@ edition = "2021"
 license = "MIT"
 description = "Rhine Music desktop: Rust core and original Three.js interface"
 
+[features]
+preview = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
