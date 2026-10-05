@@ -146,5 +146,14 @@
       "reason": "Regression for continuous ambient motion at 30/60 Hz, followed by renewed interaction and settling.",
       "sha256": "5ffe009564e35a4fd180d394980932c3dc975e26a58f8276f055332f33c9afcd"
     }
+  },
+  "mainIntegration": {
+    "commit": "7d1b9304aa4bbe4bc09fccfd5d3fa7c46d5de50d",
+    "files": {
+      "frontend/src/music-app.ts": {
+        "reason": "Preserve main QQ panel dispose lifecycle hooks alongside rendering settings.",
+        "sha256": "55d486d490a83721d9d2c404d560eed62856f9c83165795e2a53c657782aae71"
+      }
+    }
   }
 }
