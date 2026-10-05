@@ -1019,10 +1019,12 @@ player.subscribe((state) => {
 
 $("#track-seek").addEventListener("change", e => player.seek(Number((e.target as HTMLInputElement).value)));
 let panelFocus: HTMLElement | null = null;
+let disposeQqPanel: (() => void) | undefined;
 let panelTransition: SurfaceTransition | undefined,
   panelClosing = false,
   pendingPanelAfter: (() => void) | undefined;
 function closePanel(after?: () => void) {
+  disposeQqPanel?.(); disposeQqPanel = undefined;
   if (!panel) {
     after?.();
     return;
@@ -1053,6 +1055,7 @@ function closePanel(after?: () => void) {
 }
 function openPanel(next: Panel) {
   if (!next) return closePanel();
+  disposeQqPanel?.(); disposeQqPanel = undefined;
   cancelTrackReveal();
   panelTransition?.dispose();
   pendingPanelAfter = undefined;
@@ -1093,7 +1096,7 @@ function renderLibraryPanel() {
     const qqSection = document.createElement("section");
     qqSection.id = "qq-connection"; qqSection.className = "panel-section";
     $("#panel-body").prepend(qqSection);
-    mountQqPanel(qqSection, async () => { await receiveLibrary(await request<MusicLibrary>("/api/library")); }, id => revealAlbum(id));
+    disposeQqPanel = mountQqPanel(qqSection, async () => { await receiveLibrary(await request<MusicLibrary>("/api/library")); }, id => revealAlbum(id));
   }
   updateScanStatus();
   const configSection = document.createElement("section");
@@ -1189,6 +1192,7 @@ async function editGenres() {
   try {
     const rules = await request<GenreRules>("/api/genre-rules");
     if (!body?.isConnected || panel !== "library") return;
+    disposeQqPanel?.(); disposeQqPanel = undefined;
     body.innerHTML = `<p class="panel-intro">这里编辑展示流派、别名和专辑人工分类。保存后重新归并本地索引，不修改音频标签。</p><label class="field-label" for="genre-json">本地流派规则</label><textarea id="genre-json" class="json-editor" spellcheck="false">${esc(JSON.stringify(rules, null, 2))}</textarea><div class="panel-actions"><button data-action="save-genres" class="primary-button">保存并应用</button><button data-action="library">返回音乐库</button></div><p id="genre-error" role="alert"></p>`;
   } catch (error) {
     notify((error as Error).message);

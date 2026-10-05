@@ -2,34 +2,31 @@
 //! Only fixed Tencent endpoints are used, and redirect credentials stay native.
 use anyhow::{bail, Context, Result};
 use base64::Engine;
-use reqwest::{blocking::Client, cookie::{CookieStore,Jar}, Url};
+use reqwest::{blocking::Client, cookie::CookieStore, Url};
+use crate::session_jar::SessionJar;
 use serde_json::{json,Value};
-use std::{sync::Arc,time::{Duration,SystemTime,UNIX_EPOCH},io::Read};
+use std::{sync::Arc,time::{Duration,Instant,SystemTime,UNIX_EPOCH},io::Read};
 
 const GATEWAY:&str="https://u.y.qq.com/cgi-bin/musicu.fcg";
 const REFERER:&str="https://y.qq.com/";
 fn millis()->u128 {SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis()}
 pub fn hash33(value:&str,seed:u32)->u32 {value.chars().fold(seed,|a,c|a.wrapping_mul(33).wrapping_add(c as u32))&0x7fffffff}
-fn allowed(url:&Url)->bool {url.scheme()=="https" && url.username().is_empty() && url.password().is_none() && url.port().is_none_or(|p|p==443) && matches!(url.host_str(),Some("u.y.qq.com"|"y.qq.com"|"c.y.qq.com"|"c6.y.qq.com"|"ssl.ptlogin2.qq.com"|"ptlogin2.qq.com"|"graph.qq.com"|"ssl.ptlogin2.graph.qq.com"))}
+pub(crate) fn allowed(url:&Url)->bool {url.scheme()=="https" && url.username().is_empty() && url.password().is_none() && url.port().is_none_or(|p|p==443) && matches!(url.host_str(),Some("u.y.qq.com"|"y.qq.com"|"c.y.qq.com"|"c6.y.qq.com"|"ssl.ptlogin2.qq.com"|"ptlogin2.qq.com"|"graph.qq.com"|"ssl.ptlogin2.graph.qq.com"))}
 
 #[derive(Clone)]
-pub struct WebClient { http:Client, jar:Arc<Jar>, qrsig:String, qr_started:u128 }
+pub struct WebClient { http:Client, jar:Arc<SessionJar>, qrsig:String, qr_started:Option<Instant> }
 impl WebClient {
     pub fn new(session:Option<&Value>)->Result<Self> {
-        let jar=Arc::new(Jar::default());
-        if let Some(cookies)=session.and_then(|s|s["cookies"].as_array()) {
-            for cookie in cookies {
-                let domain=cookie["domain"].as_str().unwrap_or("").trim_start_matches('.');
-                let Ok(url)=Url::parse(&format!("https://{domain}/")) else {continue};
-                if !allowed(&url) && domain!="qq.com" {continue}
-                let name=cookie["name"].as_str().unwrap_or("");let value=cookie["value"].as_str().unwrap_or("");
-                if name.contains([';','\r','\n'])||value.contains([';','\r','\n']) {continue}
-                jar.add_cookie_str(&format!("{name}={value}; Domain={domain}; Path=/; Secure; HttpOnly"),&url);
-            }
-        }
+        Self::with_jar(Arc::new(SessionJar::restore(session)?))
+    }
+    fn with_jar(jar:Arc<SessionJar>)->Result<Self> {
         let http=Client::builder().cookie_provider(jar.clone()).redirect(reqwest::redirect::Policy::none())
             .user_agent("Mozilla/5.0").connect_timeout(Duration::from_secs(8)).timeout(Duration::from_secs(20)).build()?;
-        Ok(Self{http,jar,qrsig:String::new(),qr_started:0})
+        Ok(Self{http,jar,qrsig:String::new(),qr_started:None})
+    }
+    pub fn independent_copy(&self)->Result<Self> {
+        let mut copy=Self::with_jar(Arc::new(self.jar.independent_copy()))?;
+        copy.qrsig=self.qrsig.clone();copy.qr_started=self.qr_started;Ok(copy)
     }
     fn cookie(&self,name:&str,host:&str)->String {
         self.jar.cookies(&Url::parse(&format!("https://{host}/")).unwrap()).and_then(|v|v.to_str().ok().map(str::to_owned))
@@ -37,13 +34,7 @@ impl WebClient {
             .find(|(n,_)|*n==name).map(|(_,v)|v.to_owned()).unwrap_or_default()
     }
     pub fn export_session(&self)->Value {
-        let mut cookies=Vec::new();
-        for host in ["y.qq.com","graph.qq.com"] {
-            for name in ["uin","qqmusic_uin","qqmusic_key","qm_keyst","p_skey","p_uin","skey"] {
-                let value=self.cookie(name,host);if !value.is_empty(){cookies.push(json!({"domain":host,"name":name,"value":value}))}
-            }
-        }
-        json!({"cookies":cookies})
+        self.jar.export()
     }
     pub fn uin(&self)->String {let s=self.cookie("uin","y.qq.com");if s.is_empty(){self.cookie("qqmusic_uin","y.qq.com")}else{s}}
     pub fn authenticated(&self)->bool { !self.uin().is_empty() && !self.auth().is_empty() }
@@ -74,31 +65,30 @@ impl WebClient {
         let response=self.checked("https://ssl.ptlogin2.qq.com/ptqrshow")?.query(&[("appid","716027609"),("e","2"),("l","M"),("s","3"),("d","72"),("v","4"),("daid","383"),("pt_3rd_aid","100497308"),("u1","https://graph.qq.com/oauth2.0/login_jump")]).send().map_err(|_|anyhow::anyhow!("二维码获取失败"))?;
         self.qrsig=self.cookie("qrsig","ssl.ptlogin2.qq.com");let bytes=response.bytes().map_err(|_|anyhow::anyhow!("二维码读取失败"))?;
         if self.qrsig.is_empty()||!bytes.starts_with(b"\x89PNG"){bail!("没有取得有效二维码")}
-        self.qr_started=millis();Ok(format!("data:image/png;base64,{}",base64::engine::general_purpose::STANDARD.encode(bytes)))
+        self.qr_started=Some(Instant::now());Ok(format!("data:image/png;base64,{}",base64::engine::general_purpose::STANDARD.encode(bytes)))
     }
     pub fn poll(&mut self)->Result<Value>{
         if self.authenticated(){return Ok(json!({"connected":true,"message":"QQ 音乐已连接"}))}
-        if self.qrsig.is_empty()||millis()-self.qr_started>180000{return Ok(json!({"expired":true,"message":"二维码已过期，请重新获取"}))}
+        if self.qrsig.is_empty()||self.qr_started.is_none_or(|started|started.elapsed()>=Duration::from_secs(180)){self.qrsig.clear();return Ok(json!({"expired":true,"message":"二维码已过期，请重新获取"}))}
         let q=json!({"u1":"https://graph.qq.com/oauth2.0/login_jump","ptqrtoken":hash33(&self.qrsig,0),"ptredirect":"0","h":"1","t":"1","g":"1","from_ui":"1","ptlang":"2052","action":format!("0-0-{}",millis()),"js_ver":"20102616","js_type":"1","login_sig":"","pt_uistyle":"40","aid":"716027609","daid":"383","pt_3rd_aid":"100497308"});
         let params=q.as_object().unwrap().iter().map(|(k,v)|(k.clone(),v.as_str().map(str::to_owned).unwrap_or_else(||v.to_string()))).collect::<Vec<_>>();
         let text=self.checked("https://ssl.ptlogin2.qq.com/ptqrlogin")?.query(&params).send().map_err(|_|anyhow::anyhow!("二维码检查失败"))?.text().map_err(|_|anyhow::anyhow!("登录响应读取失败"))?;
-        let re=regex::Regex::new("'([^']*)'").unwrap();let fields=re.captures_iter(&text).map(|c|c[1].to_owned()).collect::<Vec<_>>();
-        match fields.first().map(String::as_str){
-            Some("66")=>return Ok(json!({"message":"请用手机 QQ 扫码"})),
-            Some("67")=>return Ok(json!({"message":"请在手机 QQ 上确认登录"})),
-            Some("65"|"68")=>return Ok(json!({"expired":true,"message":"二维码已过期或登录取消"})),
-            Some("0")=>{},_=>bail!("QQ 登录检查未通过"),
-        }
-        self.checked(fields.get(2).context("登录回调缺失")?)?.send().map_err(|_|anyhow::anyhow!("QQ 登录跳转失败"))?;
+        let callback=match qr_reply(&text)? {
+            QrReply::Waiting=>return Ok(json!({"message":"请用手机 QQ 扫码"})),
+            QrReply::Confirming=>return Ok(json!({"message":"请在手机 QQ 上确认登录"})),
+            QrReply::Expired=>{self.qrsig.clear();return Ok(json!({"expired":true,"message":"二维码已过期，请重新获取"}))},
+            QrReply::Cancelled=>{self.qrsig.clear();return Ok(json!({"cancelled":true,"message":"已在手机上取消登录"}))},
+            QrReply::Ready(callback)=>callback,
+        };
+        let response=self.checked(&callback)?.send().map_err(|_|anyhow::anyhow!("QQ 登录跳转失败"))?;
+        if !response.status().is_success()&&!response.status().is_redirection(){bail!("QQ 登录跳转失败，请重试")}
         self.finish_oauth()
     }
     fn finish_oauth(&mut self)->Result<Value>{
         let p_skey=self.cookie("p_skey","graph.qq.com");if p_skey.is_empty(){bail!("未取得 QQ 授权票据，请重新扫码")}
         let response=self.http.post("https://graph.qq.com/oauth2.0/authorize").header("Referer",REFERER).header("Origin","https://y.qq.com").form(&json!({"response_type":"code","client_id":"100497308","redirect_uri":"https://y.qq.com/portal/wx_redirect.html?login_type=1&surl=https://y.qq.com/","scope":"get_user_info","state":"state","switch":"","from_ptlogin":"1","src":"1","update_auth":"1","openapi":"1010","g_tk":hash33(&p_skey,5381),"auth_time":chrono::Local::now().format("%a %b %e %H:%M:%S %Y").to_string(),"ui":uuid::Uuid::new_v4().to_string().to_uppercase()})).send().map_err(|_|anyhow::anyhow!("QQ 音乐授权失败"))?;
         let location=response.headers().get("Location").and_then(|h|h.to_str().ok()).context("QQ 需要额外网页授权")?;
-        let location=Url::parse(location).map_err(|_|anyhow::anyhow!("授权跳转无效"))?;
-        if !allowed(&location)||location.host_str()!=Some("y.qq.com"){bail!("QQ 授权未完成，请刷新二维码并重新扫码确认")}
-        let code=location.query_pairs().find(|(k,_)|k=="code").map(|(_,v)|v.into_owned()).context("没有取得 QQ 音乐授权码")?;
+        let code=oauth_code(location)?;
         let data=Self::data(self.http.post(GATEWAY).header("Referer",REFERER).json(&json!({"comm":{"g_tk":hash33(&p_skey,5381),"platform":"yqq","ct":24,"cv":0},"req":{"module":"QQConnectLogin.LoginServer","method":"QQLogin","param":{"code":code}}})).send().map_err(|_|anyhow::anyhow!("QQ 音乐登录失败"))?)?;
         if data["code"]!=0||data["req"]["code"]!=0{bail!("QQ 音乐未接受本次授权")}
         if !self.authenticated(){bail!("授权完成但会话未建立，请重新扫码")}
@@ -159,6 +149,54 @@ impl WebClient {
     }
 }
 pub fn audio_host(url:&Url)->bool {url.scheme()=="https"&&url.username().is_empty()&&url.password().is_none()&&url.host_str().is_some_and(|h|h=="qq.com"||h.ends_with(".qq.com"))}
+
+enum QrReply { Waiting, Confirming, Expired, Cancelled, Ready(String) }
+fn qr_reply(text:&str)->Result<QrReply> {
+    if !text.trim_start().starts_with("ptuiCB("){bail!("QQ 登录响应格式变化，请重试")}
+    let fields=regex::Regex::new("'([^']*)'").unwrap().captures_iter(text).map(|capture|capture[1].to_owned()).collect::<Vec<_>>();
+    match fields.first().map(String::as_str) {
+        Some("66")=>Ok(QrReply::Waiting), Some("67")=>Ok(QrReply::Confirming),
+        Some("65")=>Ok(QrReply::Expired), Some("68")=>Ok(QrReply::Cancelled),
+        Some("0")=>{
+            let callback=fields.get(2).context("登录回调缺失")?;
+            let url=Url::parse(callback).map_err(|_|anyhow::anyhow!("登录回调无效"))?;
+            if !allowed(&url){bail!("QQ 返回了不支持的登录回调")}
+            Ok(QrReply::Ready(callback.clone()))
+        },
+        _=>bail!("QQ 登录检查未通过，请重新扫码"),
+    }
+}
+fn oauth_code(location:&str)->Result<String> {
+    let location=Url::parse(location).map_err(|_|anyhow::anyhow!("授权跳转无效"))?;
+    if !allowed(&location)||location.host_str()!=Some("y.qq.com")||location.path()!="/portal/wx_redirect.html" {
+        bail!("QQ 授权未完成，请刷新二维码并重新扫码确认")
+    }
+    location.query_pairs().find(|(name,value)|name=="code"&&!value.is_empty()).map(|(_,value)|value.into_owned()).context("没有取得 QQ 音乐授权码")
+}
+
+#[cfg(test)] mod login_protocol_tests {
+    use super::*;
+    #[test] fn callback_states_and_untrusted_responses() {
+        for (code,expected) in [("66",0),("67",1),("65",2),("68",3)] {
+            let reply=qr_reply(&format!("ptuiCB('{code}', '0', '', '0', 'synthetic');")).unwrap();
+            assert!(matches!((reply,expected),(QrReply::Waiting,0)|(QrReply::Confirming,1)|(QrReply::Expired,2)|(QrReply::Cancelled,3)));
+        }
+        assert!(matches!(qr_reply("ptuiCB('0','0','https://ssl.ptlogin2.graph.qq.com/check_sig?ticket=synthetic');").unwrap(),QrReply::Ready(_)));
+        for reply in ["ptuiCB('99','synthetic-secret');", "unexpected '66'", "ptuiCB('0','0','http://y.qq.com/');", "ptuiCB('0');"] {
+            let error=qr_reply(reply).err().unwrap().to_string();assert!(!error.contains("synthetic-secret"));
+        }
+    }
+    #[test] fn oauth_requires_expected_callback_and_nonempty_code() {
+        assert_eq!(oauth_code("https://y.qq.com/portal/wx_redirect.html?code=synthetic").unwrap(),"synthetic");
+        for location in ["https://graph.qq.com/oauth2.0/show?code=synthetic-secret","https://y.qq.com.evil.invalid/portal/wx_redirect.html?code=synthetic-secret","https://y.qq.com/portal/wx_redirect.html?code=","https://y.qq.com/other?code=synthetic-secret"] {
+            let error=oauth_code(location).unwrap_err().to_string();assert!(!error.contains("synthetic-secret"));
+        }
+    }
+    #[test] fn elapsed_qr_expires_without_a_network_request() {
+        let mut web=WebClient::new(None).unwrap();web.qrsig="synthetic".into();web.qr_started=Some(Instant::now()-Duration::from_secs(181));
+        assert_eq!(web.poll().unwrap()["expired"],true);assert!(web.qrsig.is_empty());
+    }
+}
 
 #[cfg(test)]mod tests{use super::*;#[test]fn trusted_redirect_boundaries(){assert!(allowed(&Url::parse("https://ssl.ptlogin2.graph.qq.com/check_sig").unwrap()));assert!(!allowed(&Url::parse("https://y.qq.com.evil.invalid/").unwrap()));assert!(!allowed(&Url::parse("http://y.qq.com/").unwrap()));}#[test]fn import_keeps_auth_native(){let w=WebClient::new(Some(&json!({"cookies":[{"domain":".qq.com","name":"uin","value":"1"},{"domain":".qq.com","name":"qm_keyst","value":"synthetic"}]}))).unwrap();assert!(w.authenticated());assert_eq!(w.uin(),"1");}}
 

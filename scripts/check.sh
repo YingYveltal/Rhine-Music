@@ -6,6 +6,7 @@ npm run build
 npm --prefix frontend run check:content
 npm --prefix frontend run check:viewport
 npm --prefix frontend run check:music
+npm --prefix frontend run check:qq
 node --experimental-strip-types frontend/scripts/check-bokeh-optimization.mjs
 node --experimental-strip-types frontend/scripts/check-cover-cache.mjs
 node --experimental-strip-types frontend/scripts/check-instance-visibility.mjs

@@ -3,6 +3,7 @@
 pub mod local;
 pub mod official;
 pub mod web;
+mod session_jar;
 
 use serde::{Deserialize, Serialize};
 
