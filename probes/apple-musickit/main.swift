@@ -165,7 +165,7 @@ import MusicKit
         }
     }
     func playlistSource(_ entry: Playlist.Entry, index: Int) -> [String: Any] {
-        ["ordinal": index, "playlistEntryID": entry.id.rawValue, "libraryItemID": entry.item?.id.rawValue ?? "", "position": entry.position, "title": entry.title, "artist": entry.artistName, "duration": entry.duration ?? 0]
+        ["ordinal": index, "playlistEntryID": entry.id.rawValue, "libraryItemID": entry.item?.id.rawValue ?? "", "position": entry.position, "title": entry.title, "artist": entry.artistName, "duration": entry.duration ?? 0, "itemType": entry.item.map { item in switch item { case .song: return "song"; case .musicVideo: return "musicVideo"; @unknown default: return "unknown" } } ?? "nil", "hasEntryPlayParameters": entry.playParameters != nil, "hasItemPlayParameters": entry.item?.playParameters != nil]
     }
     func numberOfRows(in tableView: NSTableView) -> Int { playlistEntries.count }
     func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int) -> Any? {
@@ -181,22 +181,26 @@ import MusicKit
         let index = playlistTable.selectedRow
         guard playlistEntries.indices.contains(index), let playlist = loadedPlaylist else { return }
         let entries = playlistEntries
-        startQueue(entries.map { MusicPlayer.Queue.Entry($0) }, sources: entries.enumerated().map { playlistSource($0.element, index: $0.offset) }, index: index, scope: "playlist:" + playlist.id.rawValue)
+        startQueue(entries.map { MusicPlayer.Queue.Entry($0) }, sources: entries.enumerated().map { playlistSource($0.element, index: $0.offset) }, index: index, scope: "playlist:" + playlist.id.rawValue, playlist: playlist, playlistStart: entries[index])
     }
     func play(index: Int) {
         guard songs.indices.contains(index) else { status.stringValue = "该位置没有样本；不得以单首冒充中间队列测试。"; return }
         let captured = songs
         startQueue(captured.map { MusicPlayer.Queue.Entry($0) }, sources: captured.enumerated().map { ["ordinal": $0.offset, "libraryItemID": $0.element.id.rawValue, "title": $0.element.title] }, index: index, scope: sampleScope)
     }
-    func startQueue(_ entries: [MusicPlayer.Queue.Entry], sources: [[String: Any]], index: Int, scope: String) {
+    func startQueue(_ entries: [MusicPlayer.Queue.Entry], sources: [[String: Any]], index: Int, scope: String, playlist: Playlist? = nil, playlistStart: Playlist.Entry? = nil) {
         guard !busy else { return }
         generation += 1; let ticket = generation; queueGeneration += 1; intent = "playing"
         queueSources = zip(sources, entries).map { source, entry in var row = source; row["inputQueueEntryID"] = entry.id; return row }
         lastMapping = nil
         run("原生队列播放") {
             let p = ApplicationMusicPlayer.shared; self.player = p
-            p.queue = ApplicationMusicPlayer.Queue(entries, startingAt: entries[index])
-            self.log("queueRequest", ["scope": scope, "queueGeneration": self.queueGeneration, "commandGeneration": ticket, "sources": self.queueSources, "startIndex": index])
+            if let playlist, let playlistStart {
+                p.queue = ApplicationMusicPlayer.Queue(playlist: playlist, startingAt: playlistStart)
+            } else {
+                p.queue = ApplicationMusicPlayer.Queue(entries, startingAt: entries[index])
+            }
+            self.log("queueRequest", ["scope": scope, "constructor": playlist == nil ? "entries" : "playlist", "queueGeneration": self.queueGeneration, "commandGeneration": ticket, "sources": self.queueSources, "startIndex": index])
             self.recordMapping()
             do { try await p.play() }
             catch { if ticket == self.generation { self.intent = "stopped" }; self.settle(ticket); throw error }
@@ -252,12 +256,14 @@ import MusicKit
     }
     func recordMapping() {
         guard let p = player else { return }
-        let rows: [[String: Any]] = p.queue.entries.enumerated().map { index, entry in
+        let observed = Array(p.queue.entries)
+        let aligned = observed.count == queueSources.count && zip(observed, queueSources).allSatisfy { $0.0.title == ($0.1["title"] as? String) }
+        let rows: [[String: Any]] = observed.enumerated().map { index, entry in
             var row: [String: Any] = ["runtimeOrdinal": index, "entryID": entry.id, "resolvedItemID": entry.item?.id.rawValue ?? "", "observedTitle": entry.title]
-            if queueSources.indices.contains(index) { row["constructorSource"] = queueSources[index] }
+            if aligned && queueSources.indices.contains(index) { row["constructorSource"] = queueSources[index] }
             return row
         }
-        let mapping: [String: Any] = ["queueGeneration": queueGeneration, "commandGeneration": generation, "sourceCount": queueSources.count, "observedCount": rows.count, "rows": rows]
+        let mapping: [String: Any] = ["queueGeneration": queueGeneration, "commandGeneration": generation, "sourceCount": queueSources.count, "observedCount": rows.count, "fullOrderedTitlesAligned": aligned, "rows": rows]
         let data = try? JSONSerialization.data(withJSONObject: mapping, options: [.sortedKeys])
         if data != lastMapping { log("queueMapping", mapping); lastMapping = data }
     }
@@ -265,7 +271,10 @@ import MusicKit
         guard let p = player else { return }
         // No EOF inference or play command is issued here. Only explicit Pause/Stop
         // intent is re-applied if an in-flight SDK operation finishes late.
-        if intent != "playing" { enforceIntent() }
+        if intent != "playing" {
+            log("playerBeforeIntent", ["intent": intent, "nativeState": String(describing: p.state.playbackStatus), "position": p.playbackTime.isFinite ? p.playbackTime : 0, "entryID": p.queue.currentEntry?.id ?? "", "commandGeneration": generation, "queueGeneration": queueGeneration])
+            enforceIntent()
+        }
         recordMapping()
         let entry = p.queue.currentEntry, state = String(describing: p.state.playbackStatus), time = p.playbackTime
         let id = entry?.item?.id.rawValue ?? "", title = entry?.title ?? ""
