@@ -32,7 +32,7 @@ import {
 import { MusicPlayer, type MusicPlayerState } from "./music-player";
 import { isNative, nativeInvoke, nativeRequest, NativeMusicPlayer } from "./native";
 import { appendMusicFolders } from "./library-folders";
-import { beginMeasurement, recordInteraction, sampleFrame } from "./performance-probe";
+import { beginMeasurement, recordInteraction, sampleFrame, measurementActive, recordLibraryRefresh, recordDocumentLayout } from "./performance-probe";
 import { ModelViewer } from "./model-viewer";
 import { TerminalAudio } from "./audio";
 import type {
@@ -308,6 +308,12 @@ const documentDecryption = new DocumentDecryption(
   "h1, .detail-artist, .album-facts span, .track-name strong, .album-about p",
   0.35,
 );
+function measureDocumentLayout(phase: string, work: () => void) {
+  if (!measurementActive()) { work(); return; }
+  const start = performance.now();
+  try { work(); }
+  finally { recordDocumentLayout(performance.now() - start, phase, documentDecryption.batchLayout); }
+}
 const tabTransition = new ContentTransition();
 const detailTransition = new SurfaceTransition(
   $("#music-detail"),
@@ -384,7 +390,7 @@ const presentation = new MusicPresentation({
     detail.setAttribute("aria-hidden", "false");
     content.inert = false;
     content.scrollTop = 0;
-    documentDecryption.reset(content, preferences.reduced);
+    measureDocumentLayout("show-menu", () => documentDecryption.reset(content, preferences.reduced));
     pendingDetailFocus = true;
   },
   hideMenu: (done) => {
@@ -455,7 +461,7 @@ function fit() {
   viewer?.resize();
   if (mode === "detail") {
     syncTabIndicator(false);
-    documentDecryption.refresh();
+    measureDocumentLayout("resize", () => documentDecryption.refresh());
   }
 }
 window.addEventListener("resize", fit);
@@ -519,9 +525,11 @@ async function receiveLibrary(next: MusicLibrary, force = false) {
   const scanFailed = libraryReceived && previousScan.running && !next.scan.running && !!next.scan.error;
   libraryReceived = true;
   const previousIntroductionRun = library.introductions;
+  const comparisonStart = measurementActive() ? performance.now() : 0;
   const changed =
     JSON.stringify(next.albums) !== JSON.stringify(library.albums) ||
     JSON.stringify(next.genres) !== JSON.stringify(library.genres);
+  if (measurementActive()) recordLibraryRefresh(performance.now() - comparisonStart, changed, next.albums.length);
   library = next;
   if (library.introductions?.running) introductionRequestError = "";
   if (changed || force) await applyLibrary();
@@ -810,7 +818,7 @@ function setTab(tab: "tracks" | "about") {
   content.innerHTML =
     tab === "tracks" ? trackList(a, a.discCount || 1) : albumAbout(a);
   content.setAttribute("aria-labelledby", `tab-${tab}`);
-  documentDecryption.refresh();
+  measureDocumentLayout("tab", () => documentDecryption.refresh());
   tabTransition.reveal(content, preferences.reduced);
   updatePlayingRows();
   effects.play("ui-tick");
@@ -857,10 +865,10 @@ function renderDetail() {
     <div id="album-tab-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === "tracks" ? trackList(a, discs) : albumAbout(a)}</div>`;
   article.scrollTop = scroll;
   syncTabIndicator(false);
-  documentDecryption.reset(
+  measureDocumentLayout("detail", () => documentDecryption.reset(
     article,
     preferences.reduced || scene?.decryptionFrame.phase === "clear",
-  );
+  ));
   updatePlayingRows();
 }
 function trackList(a: MusicAlbum, discs: number) {
@@ -1707,6 +1715,13 @@ function frame(ms: number) {
 let stressPending = false;
 window.addEventListener("keydown", (event) => {
   if (!event.ctrlKey || !event.altKey || !scene || !ready) return;
+  if (import.meta.env.VITE_RENDER_WORK_QA === "1" && event.code === "KeyL") {
+    event.preventDefault();
+    if (measurementActive()) return;
+    documentDecryption.batchLayout = !documentDecryption.batchLayout;
+    notify(`文字遮罩批量布局：${documentDecryption.batchLayout ? "开启" : "关闭"}`);
+    return;
+  }
   if(event.code === "KeyH" && scene.nativeMetal.stats.active) {event.preventDefault();void nativeInvoke("metal_profile_slow");notify("捕获下一张 GPU 长帧；本轮仅作诊断");return;}
   if(event.code === "KeyR") {event.preventDefault();scene.benchmarkDevicePixelRatio=scene.benchmarkDevicePixelRatio?undefined:2;scene.resize();notify(`Retina 负载对照：${scene.benchmarkDevicePixelRatio ? "开启" : "关闭"}`);return;}
   if(event.code === "KeyT") {event.preventDefault();scene.transmissionDepthEnabled=!scene.transmissionDepthEnabled;notify(`透射深度预计算：${scene.transmissionDepthEnabled ? "开启" : "关闭"}`);return;}
@@ -1730,7 +1745,7 @@ window.addEventListener("keydown", (event) => {
     stressPending=false;
     if(!scene || document.hidden)return;
     const label=`${scene.renderingOptimized ? "optimized" : "baseline"}-stress-${preferences.theme}`;
-    if(!beginMeasurement(label,28,{quality:renderQuality,theme:preferences.theme,albums:albums.length,rateHz:8,expectedFinalAlbum:records[0]?.album?.id,expectedFinalPhase:"detail"},scene))return;
+    if(!beginMeasurement(label,28,{quality:renderQuality,batchedDocumentLayout:documentDecryption.batchLayout,theme:preferences.theme,albums:albums.length,rateHz:8,expectedFinalAlbum:records[0]?.album?.id,expectedFinalPhase:"detail"},scene))return;
     const start=performance.now();
     const schedule=(ms:number,name:string,action:()=>void)=>setTimeout(()=>recordInteraction(name,start+ms,action,scene!),ms);
     for(let i=0;i<32;i++)schedule(500+i*125,"album-burst",()=>stepAlbum(Math.floor(i/8)%2?-1:1));
@@ -1748,7 +1763,7 @@ window.addEventListener("keydown", (event) => {
   event.preventDefault();
   const moving = event.code === "KeyM";
   const label = `${scene.renderingOptimized ? "optimized" : "baseline"}-${moving ? "motion" : presentation.phase}-${preferences.theme}`;
-  if (!beginMeasurement(label, 20, {quality:renderQuality,theme:preferences.theme,albums:albums.length,phase:presentation.phase},scene)) return;
+  if (!beginMeasurement(label, 20, {quality:renderQuality,batchedDocumentLayout:documentDecryption.batchLayout,theme:preferences.theme,albums:albums.length,phase:presentation.phase},scene)) return;
   if (moving) for (const [ms,action] of [[1000,()=>stepAlbum(1)],[4000,()=>stepAlbum(-1)],[7000,()=>presentation.open()],[11000,()=>stepAlbum(1)],[15000,()=>presentation.back()]] as const) setTimeout(action,ms);
 });
 async function start() {
