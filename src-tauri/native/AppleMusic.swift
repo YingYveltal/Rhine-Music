@@ -17,7 +17,7 @@ private func digest(_ fields: [String]) -> String {
 @available(macOS 14.0, *)
 @MainActor private final class AppleBridge {
     static let shared = AppleBridge()
-    struct Item { let track: Track; let json: [String: Any] }
+    struct Item { let track: Track; let json: [String: Any]; let supported: Bool }
     var items: [String: Item] = [:]
     var albums: [[String: Any]] = []
     var syncing = false
@@ -73,13 +73,13 @@ private func digest(_ fields: [String]) -> String {
             var rows: [[String: Any]] = []
             for (i, entry) in entries.enumerated() {
                 let id = "apple-track-" + digest([albumID, revision, entry.id.rawValue, String(i)])
-                let playable: Bool
-                if case .song = tracks[i] { playable = tracks[i].playParameters != nil } else { playable = false }
+                let supported: Bool
+                if case .song = tracks[i] { supported = true } else { supported = false }
                 let row: [String: Any] = ["id": id, "albumId": albumID, "source": "apple", "title": entry.title,
                     "artist": entry.artistName, "trackNumber": i + 1, "duration": entry.duration ?? 0,
-                    "format": "Apple Music", "browserPlayable": playable, "audioUrl": "", "relativePath": "",
+                    "format": "Apple Music", "browserPlayable": false, "audioUrl": "", "relativePath": "",
                     "sourcePosition": i, "snapshotRevision": revision]
-                rows.append(row); nextItems[id] = Item(track: tracks[i], json: row)
+                rows.append(row); nextItems[id] = Item(track: tracks[i], json: row, supported: supported)
             }
             var album: [String: Any] = ["id": albumID, "source": "apple", "kind": "playlist", "title": playlist.name,
                 "artist": playlist.curatorName ?? "Apple Music", "genreId": "apple-playlists", "rawGenres": [],
@@ -111,7 +111,10 @@ private func digest(_ fields: [String]) -> String {
         guard ticket == generation else { throw failure("停止操作已被后续命令替代") }
         // Never trust a stale paused snapshot at a late play() completion.
         player.stop()
+        let deadline = Date().addingTimeInterval(15)
         while player.state.playbackStatus == .playing {
+            guard ticket == generation else { throw failure("停止操作已被后续命令替代") }
+            guard Date() < deadline else { throw failure("Apple Music 尚未确认停止，已取消来源切换") }
             try await Task.sleep(nanoseconds: 10_000_000)
             player.stop()
         }
@@ -138,7 +141,7 @@ private func digest(_ fields: [String]) -> String {
                 guard let item = items[id] else { throw failure("歌单已变化，请重新同步后点播") }
                 return item
             }
-            guard requested[index].json["browserPlayable"] as? Bool == true else { throw failure("这个歌单条目暂不可播放") }
+            guard requested[index].supported else { throw failure("首版暂不支持此类型的歌单条目") }
             let selectedNativeID = requested[index].track.id
             guard requested.filter({ $0.track.id == selectedNativeID }).count == 1 else {
                 throw failure("此歌曲在当前队列重复出现，暂无法唯一定位所选位置")

@@ -371,7 +371,7 @@ fn toggle_fullscreen(window: tauri::WebviewWindow) -> std::result::Result<(), St
 }
 #[tauri::command]
 async fn qq_request(core:State<'_,Arc<Core>>,operation:String,body:Option<Value>)->std::result::Result<Value,String>{
-    if operation=="logout" {let _ = core.audio.send(player::Command::Stop);}
+    if operation=="logout" {let _ = core.audio.send(player::Command::DisableQq);}
     let qq=core.qq.clone();
     tauri::async_runtime::spawn_blocking(move||qq.request(&operation,body.unwrap_or(json!({}))).map_err(|e|e.to_string())).await.map_err(|_|"QQ 后台任务未完成".to_owned())?
 }

@@ -9,7 +9,7 @@ use std::{collections::BTreeSet, sync::{Arc, Mutex}, time::{Duration, Instant}};
 #[derive(Clone)]
 pub enum Command {
     Play(Vec<Track>, usize), ApplePlay { id: String, ids: Vec<String> },
-    Toggle, Stop, DisableApple, Seek(f64), Next, Previous, Unlock,
+    Toggle, Stop, DisableApple, DisableQq, Seek(f64), Next, Previous, Unlock,
     Settings(f32, f32, f32, bool, bool),
 }
 pub trait Local: Send + Sync {
@@ -78,6 +78,14 @@ impl Driver {
         }
     }
     fn accept(&mut self, mut e:Envelope) {
+        if matches!(e.command,Command::DisableQq) {
+            let preparing_qq=self.pending.as_ref().is_some_and(|p|match &p.command {
+                Command::Play(tracks,index)=>tracks.get(*index).is_some_and(|t|t.id.starts_with("qq-")),_=>false,
+            });
+            let leaving_qq=self.pending.as_ref().is_some_and(|p|matches!(p.command,Command::ApplePlay{..}));
+            if preparing_qq || (!leaving_qq && !self.apple_owned && self.source.as_deref()==Some("qq")) { e.command=Command::Stop; }
+            else { self.done.insert(e.receipt);return; }
+        }
         if matches!(e.command,Command::DisableApple) {
             if self.apple_owned { e.command=Command::Stop; }
             else {self.done.insert(e.receipt);return;}
@@ -285,5 +293,23 @@ mod tests {
         local.finish(2,"idle");d.advance();assert_eq!(d.applied,0);
         native.take("stop").send(Ok(native_state("idle"))).unwrap();d.advance();
         native.take("play").send(Ok(native_state("playing"))).unwrap();d.advance();assert_eq!(d.applied,2);
+    }
+    #[test]
+    fn qq_logout_does_not_stop_apple_and_disabling_pending_apple_cancels_it() {
+        let local=Arc::new(FakeLocal::default());let native=Arc::new(FakeNative::default());
+        let mut d=Driver::new(local.clone(),native.clone());
+        d.accept(Envelope{receipt:1,command:apple_play()});native.take("stop").send(Ok(native_state("idle"))).unwrap();local.finish(1,"idle");d.advance();
+        native.take("play").send(Ok(native_state("playing"))).unwrap();d.advance();
+        d.accept(Envelope{receipt:2,command:Command::DisableQq});d.advance();
+        assert_eq!(d.applied,2);assert!(native.requests.lock().unwrap().is_empty());
+        assert_eq!(d.snapshot()["playing"],true);
+        d.accept(Envelope{receipt:3,command:apple_play()});
+        let obsolete_stop=native.take("stop");
+        d.accept(Envelope{receipt:4,command:Command::DisableApple});
+        assert!(obsolete_stop.send(Ok(native_state("idle"))).is_err());
+        native.take("stop").send(Ok(native_state("idle"))).unwrap();local.finish(3,"idle");d.advance();
+        local.finish(5,"idle");d.advance();
+        assert_eq!(d.applied,4);assert_eq!(d.snapshot()["transport"],"idle");
+        assert!(native.requests.lock().unwrap().is_empty(),"cancelled queue must never start");
     }
 }

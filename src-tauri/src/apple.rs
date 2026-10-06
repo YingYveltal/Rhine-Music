@@ -50,7 +50,7 @@ impl Apple {
     pub fn new(dir: &Path) -> Result<Arc<Self>> {
         let dir = dir.join("apple"); std::fs::create_dir_all(dir.join("covers"))?;
         let saved: Value = std::fs::read(dir.join("library.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(json!({}));
-        let enabled = saved["enabled"].as_bool().unwrap_or(false);
+        let enabled = saved["enabled"].as_bool().unwrap_or(true);
         let albums = saved["albums"].as_array().cloned().unwrap_or_default();
         let updated_at = saved["updatedAt"].as_str().map(str::to_owned);
         Ok(Arc::new(Self { dir, native: Arc::new(MusicKit), cache: Mutex::new(Cache { albums, enabled, updated_at,
@@ -179,5 +179,14 @@ mod tests {
         assert_eq!(reopened.albums()[0]["tracks"][1]["id"],"entry-2");
         assert_eq!(reopened.status()["trackCount"],2);
         assert_eq!(reopened.status()["enabled"],true);
+    }
+    #[test]
+    fn first_sync_is_visible_but_an_explicit_disabled_preference_survives_restart() {
+        let dir=tempfile::tempdir().unwrap();let apple=Apple::new(dir.path()).unwrap();
+        assert_eq!(apple.status()["enabled"],true);
+        assert_eq!(apple.status()["authorization"],"notDetermined");
+        assert_eq!(apple.status()["playlistCount"],0);
+        apple.request("enable",json!({"enabled":false})).unwrap();
+        assert_eq!(Apple::new(dir.path()).unwrap().status()["enabled"],false);
     }
 }
