@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import "MusicAPI.h"
+#import <Carbon/Carbon.h>
 
 static NSString *FourCC(NSInteger code) {
     char s[5]={(code>>24)&255,(code>>16)&255,(code>>8)&255,code&255,0};
@@ -15,7 +16,8 @@ static NSString *Cloud(NSInteger code) {
 @interface Probe : NSObject <NSApplicationDelegate,NSTableViewDataSource,NSTableViewDelegate,SBApplicationDelegate>
 @property NSWindow *window;
 @property NSTextField *status,*now,*seek;
-@property NSPopUpButton *lists;
+@property NSPopUpButton *lists,*variant;
+@property NSInteger loadedPlaylistIndex;
 @property NSTableView *table;
 @property NSMutableArray<NSButton *> *controls;
 @property NSMutableArray *pending;
@@ -74,6 +76,9 @@ static NSString *Cloud(NSInteger code) {
     [self label:@"定位秒数" frame:NSMakeRect(20,112,80,25)];
     self.seek=[[NSTextField alloc] initWithFrame:NSMakeRect(100,110,100,28)];self.seek.stringValue=@"60";self.seek.accessibilityLabel=@"定位秒数";[self.window.contentView addSubview:self.seek];
     [self button:@"跳转" action:@selector(seekTo:) frame:NSMakeRect(210,109,85,30) control:YES];
+    self.variant=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(320,109,680,30) pullsDown:NO];
+    [self.variant addItemsWithTitles:@[@"原始 Apple Event：歌单内序号引用",@"Scripting Bridge：重新获取歌单内引用",@"旧版：已读取的曲目对象",@"原始事件：省略 once",@"原始事件：歌单 subject",@"曲目对象：playOnce",@"原始事件：所选至末尾范围"]];
+    [self.window.contentView addSubview:self.variant];
     self.now=[self label:@"尚未读取播放状态。命令成功不代表已经出声，需同时观察实际进度并确认听感。" frame:NSMakeRect(20,20,1000,75)];
     NSMenu *menu=NSMenu.new;NSMenuItem *app=NSMenuItem.new;[menu addItem:app];NSMenu *submenu=NSMenu.new;[submenu addItemWithTitle:@"退出探针" action:@selector(terminate:) keyEquivalent:@"q"];app.submenu=submenu;NSApp.mainMenu=menu;
     [self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
@@ -108,6 +113,8 @@ static NSString *Cloud(NSInteger code) {
             [self log:@"automationRequest" data:@{@"status":@(permission)}];
         }
         if(permission!=noErr){self.lastError=[NSError errorWithDomain:NSOSStatusErrorDomain code:permission userInfo:@{NSLocalizedDescriptionKey:@"Music.app 自动化尚未获准；请正常处理系统提示或检查自动化设置。"}];return;}
+        [self log:@"preferences" data:@{@"fixedIndexing":@(self.music.fixedIndexing),@"shuffle":@(self.music.shuffleEnabled),@"repeat":FourCC(self.music.songRepeat)}];
+        if(self.lastError)return;
         [self log:@"readingVersion" data:@{}];
         NSString *version=self.music.version;if(self.lastError)return;
         items=[[self.music playlists] get];
@@ -135,17 +142,65 @@ static NSString *Cloud(NSInteger code) {
         for(NSUInteger i=0;i<MIN(total,250);i++){
             RMTrack *t=elements[i];NSString *name=t.name?:@"",*artist=t.artist?:@"",*kind=t.kind?:@"";NSInteger cloud=t.cloudStatus;double duration=t.duration;
             if(self.lastError)break;
-            [objects addObject:t];[data addObject:@{@"order":@(i+1),@"name":name,@"artist":artist,@"kind":kind,@"cloud":FourCC(cloud),@"duration":@(duration),@"source":[NSString stringWithFormat:@"%@ / %@",Cloud(cloud),kind]}];
+            [objects addObject:t];[data addObject:@{@"order":@(i+1),@"persistentID":t.persistentID?:@"",@"name":name,@"artist":artist,@"kind":kind,@"cloud":FourCC(cloud),@"duration":@(duration),@"source":[NSString stringWithFormat:@"%@ / %@",Cloud(cloud),kind]}];
         }
         tracks=objects;rows=data;[self log:@"playlistTracks" data:@{@"total":@(total),@"rows":rows}];
-    } completion:^(BOOL ok){if(!ok)return;self.tracks=tracks;self.rows=rows;[self.table reloadData];if(rows.count)[self.table selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];self.status.stringValue=[NSString stringWithFormat:@"读取 %lu / %lu 首，保留接口顺序（最多显示前 250 首）",rows.count,total];}];
+    } completion:^(BOOL ok){if(!ok)return;self.loadedPlaylistIndex=index;self.tracks=tracks;self.rows=rows;[self.table reloadData];if(rows.count)[self.table selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];self.status.stringValue=[NSString stringWithFormat:@"读取 %lu / %lu 首，保留接口顺序（最多显示前 250 首）",rows.count,total];}];
 }
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView{return self.rows.count;}
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)column row:(NSInteger)row {
     NSDictionary *item=self.rows[row];return item[@[@"order",@"name",@"artist",@"source",@"duration"][column.identifier.integerValue]];
 }
 - (void)playPlaylist:(id)sender {NSInteger i=self.lists.indexOfSelectedItem;if(i<0||(NSUInteger)i>=self.playlists.count)return;RMPlaylist *playlist=self.playlists[i];[self run:@"播放歌单队列" work:^{[self.music play:playlist once:NO];} completion:nil];}
-- (void)playSelected:(id)sender {NSInteger row=self.table.selectedRow;if(row<0||(NSUInteger)row>=self.tracks.count)return;RMTrack *track=self.tracks[row];[self run:@"播放所选" work:^{[self.music play:track once:NO];} completion:nil];}
+// Public Apple Event object specifiers preserve the container until Music resolves
+// the play command. No library object is created or changed.
+static NSAppleEventDescriptor *Indexed(DescType type, NSInteger index, NSAppleEventDescriptor *container) {
+    NSAppleEventDescriptor *ref=[NSAppleEventDescriptor recordDescriptor];
+    [ref setDescriptor:[NSAppleEventDescriptor descriptorWithTypeCode:type] forKeyword:keyAEDesiredClass];
+    [ref setDescriptor:container forKeyword:keyAEContainer];
+    [ref setDescriptor:[NSAppleEventDescriptor descriptorWithEnumCode:formAbsolutePosition] forKeyword:keyAEKeyForm];
+    [ref setDescriptor:[NSAppleEventDescriptor descriptorWithInt32:(int32_t)index] forKeyword:keyAEKeyData];
+    return [ref coerceToDescriptorType:typeObjectSpecifier];
+}
+- (void)playSelected:(id)sender {
+    NSInteger row=self.table.selectedRow,playlist=self.loadedPlaylistIndex,variant=self.variant.indexOfSelectedItem;
+    if(row<0||(NSUInteger)row>=self.tracks.count)return;
+    RMTrack *track=self.tracks[row];
+    [self run:@"播放所选" work:^{
+        [self log:@"selectionRequest" data:@{@"variant":@(variant),@"playlistIndex":@(playlist+1),@"trackIndex":@(row+1),@"expected":self.rows[row]}];
+        if(variant==0||variant==3||variant==4||variant==6){
+            NSAppleEventDescriptor *list=Indexed('cPly',playlist+1,[NSAppleEventDescriptor nullDescriptor]);
+            NSAppleEventDescriptor *item=Indexed('cTrk',row+1,list);
+            if(variant==6){
+                NSAppleEventDescriptor *range=[NSAppleEventDescriptor recordDescriptor];
+                [range setDescriptor:Indexed('cTrk',row+1,[NSAppleEventDescriptor descriptorWithDescriptorType:typeCurrentContainer bytes:NULL length:0]) forKeyword:keyAERangeStart];
+                [range setDescriptor:Indexed('cTrk',self.rows.count,[NSAppleEventDescriptor descriptorWithDescriptorType:typeCurrentContainer bytes:NULL length:0]) forKeyword:keyAERangeStop];
+                [item setDescriptor:[NSAppleEventDescriptor descriptorWithEnumCode:formRange] forKeyword:keyAEKeyForm];
+                [item setDescriptor:[range coerceToDescriptorType:typeRangeDescriptor] forKeyword:keyAEKeyData];
+            }
+            NSAppleEventDescriptor *event=[NSAppleEventDescriptor appleEventWithEventClass:'hook' eventID:'Play' targetDescriptor:[NSAppleEventDescriptor descriptorWithBundleIdentifier:@"com.apple.Music"] returnID:kAutoGenerateReturnID transactionID:kAnyTransactionID];
+            [event setParamDescriptor:item forKeyword:keyDirectObject];
+            if(variant!=3)[event setParamDescriptor:[NSAppleEventDescriptor descriptorWithBoolean:NO] forKeyword:'POne'];
+            if(variant==4)[event setAttributeDescriptor:list forKeyword:keySubjectAttr];
+            NSError *error=nil;
+            NSAppleEventDescriptor *reply=[event sendEventWithOptions:NSAppleEventSendWaitForReply timeout:30 error:&error];
+            [self log:@"rawPlayReply" data:@{@"request":event.description,@"reply":reply.description?:@"",@"transportError":error.localizedDescription?:@""}];
+            self.lastError=error;
+            NSInteger code=[[reply paramDescriptorForKeyword:keyErrorNumber] int32Value];
+            if(code)self.lastError=[NSError errorWithDomain:NSOSStatusErrorDomain code:code userInfo:@{NSLocalizedDescriptionKey:[reply paramDescriptorForKeyword:keyErrorString].stringValue?:@"Music rejected play"}];
+        }else if(variant==1||variant==5){
+            RMPlaylist *list=[self.music playlists][playlist];
+            RMTrack *nested=list.tracks[row];
+            [self log:@"bridgeReference" data:@{@"playlist":list.description,@"track":nested.description}];
+            if(variant==5){
+                BOOL supported=[nested respondsToSelector:@selector(playOnce:)];
+                [self log:@"objectReceiver" data:@{@"supportsPlayOnce":@(supported)}];
+                if(supported)[nested playOnce:NO];
+                else self.lastError=[NSError errorWithDomain:@"RhineProbe" code:-1708 userInfo:@{NSLocalizedDescriptionKey:@"当前运行时对象没有公开生成 playOnce: 方法"}];
+            }else [self.music play:nested once:NO];
+        }else [self.music play:track once:NO];
+    } completion:nil];
+}
 - (void)pause:(id)sender {[self run:@"暂停" work:^{[self.music pause];} completion:nil];}
 - (void)resume:(id)sender {[self run:@"继续播放" work:^{[self.music play:nil once:NO];} completion:nil];}
 - (void)previous:(id)sender {[self run:@"上一首" work:^{[self.music previousTrack];} completion:nil];}
@@ -157,10 +212,10 @@ static NSString *Cloud(NSInteger code) {
     if(!self.music.running){self.now.stringValue=@"Music.app 未运行；请先打开音乐 App，再连接。";return;}
     __block NSDictionary *state;
     [self run:@"播放状态" work:^{
-        NSInteger code=self.music.playerState;double position=self.music.playerPosition;if(self.lastError)return;
-        NSString *name=@"",*kind=@"",*cloud=@"";double duration=0;
-        if(code!='kPSS'){RMTrack *track=self.music.currentTrack;name=track.name?:@"";duration=track.duration;kind=track.kind?:@"";cloud=Cloud(track.cloudStatus);}
-        state=@{@"state":FourCC(code),@"position":@(position),@"duration":@(duration),@"track":name,@"kind":kind,@"cloud":cloud,@"volume":@(self.music.soundVolume),@"mute":@(self.music.mute)};
+        NSInteger code=self.music.playerState;if(self.lastError)return;double position=code=='kPSS'?0:self.music.playerPosition;if(self.lastError)return;
+        NSString *name=@"",*kind=@"",*cloud=@"",*persistentID=@"";double duration=0;
+        if(code!='kPSS'){RMTrack *track=self.music.currentTrack;name=track.name?:@"";persistentID=track.persistentID?:@"";duration=track.duration;kind=track.kind?:@"";cloud=Cloud(track.cloudStatus);}
+        state=@{@"state":FourCC(code),@"position":@(position),@"duration":@(duration),@"track":name,@"persistentID":persistentID,@"kind":kind,@"cloud":cloud,@"volume":@(self.music.soundVolume),@"mute":@(self.music.mute)};
         if(!self.lastError)[self log:@"player" data:state];
     } completion:^(BOOL ok){if(ok)self.now.stringValue=[NSString stringWithFormat:@"状态 %@ · %.1f / %.1f 秒 · 音量 %@ · 静音 %@\n%@\n%@ / %@",state[@"state"],[state[@"position"] doubleValue],[state[@"duration"] doubleValue],state[@"volume"],state[@"mute"],state[@"track"],state[@"cloud"],state[@"kind"]];}];
 }

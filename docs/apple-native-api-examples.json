@@ -1,0 +1,85 @@
+{
+  "note": "Synthetic contract examples; not account data or runtime acceptance evidence.",
+  "status": {
+    "supported": true,
+    "authorization": "authorized",
+    "enabled": true,
+    "playlistCount": 1,
+    "trackCount": 2,
+    "updatedAt": "2026-10-07T00:00:00Z",
+    "unavailableReason": null,
+    "job": {
+      "running": false,
+      "completed": 1,
+      "total": 1,
+      "message": null,
+      "error": null
+    }
+  },
+  "album": {
+    "id": "apple-playlist-example",
+    "source": "apple",
+    "kind": "playlist",
+    "title": "Example playlist",
+    "artist": "Apple Music",
+    "genreId": "apple-playlists",
+    "rawGenres": [],
+    "folder": "",
+    "producers": [],
+    "offline": false,
+    "complete": true,
+    "loadError": null,
+    "snapshotRevision": "example-revision",
+    "tracks": [
+      {
+        "id": "apple-track-occurrence-1",
+        "albumId": "apple-playlist-example",
+        "source": "apple",
+        "title": "Example song",
+        "artist": "Example artist",
+        "trackNumber": 1,
+        "duration": 180,
+        "format": "Apple Music",
+        "browserPlayable": false,
+        "audioUrl": "",
+        "relativePath": "",
+        "sourcePosition": 0,
+        "snapshotRevision": "example-revision"
+      },
+      {
+        "id": "apple-track-occurrence-2",
+        "albumId": "apple-playlist-example",
+        "source": "apple",
+        "title": "Example song",
+        "artist": "Example artist",
+        "trackNumber": 2,
+        "duration": 180,
+        "format": "Apple Music",
+        "browserPlayable": false,
+        "audioUrl": "",
+        "relativePath": "",
+        "sourcePosition": 1,
+        "snapshotRevision": "example-revision"
+      }
+    ]
+  },
+  "player_state_stopped": {
+    "source": "apple",
+    "track": null,
+    "playing": false,
+    "elapsed": 0,
+    "transport": "idle",
+    "currentIndex": 0,
+    "queueGeneration": 1,
+    "appliedCommand": 12,
+    "error": null,
+    "workerError": null,
+    "bgmPlaying": false,
+    "bgmError": null,
+    "capabilities": {
+      "seek": true,
+      "volume": false,
+      "fade": false
+    }
+  }
+}
