@@ -24,6 +24,7 @@ import MusicKit
     var playlistScroll: NSScrollView!
     var playlists: [Playlist] = []
     var playlistEntries: [Playlist.Entry] = []
+    var playlistTracks: [Track] = []
     var loadedPlaylist: Playlist?
     var queueSources: [[String: Any]] = []
     var lastMapping: Data?
@@ -149,7 +150,7 @@ import MusicKit
         guard playlists.indices.contains(index) else { return }
         let playlist = playlists[index]
         run("读取歌单条目") {
-            self.playlistEntries = []; self.loadedPlaylist = nil; self.playlistTable.reloadData()
+            self.playlistEntries = []; self.playlistTracks = []; self.loadedPlaylist = nil; self.playlistTable.reloadData()
             self.log("playlistRelationshipRequest", ["playlistID": playlist.id.rawValue, "relationship": "entries", "preferredSource": "library"])
             let hydrated = try await playlist.with(.entries, preferredSource: .library)
             guard var batch = hydrated.entries else { throw NSError(domain: "RhineProbe.MissingPlaylistEntries", code: 1) }
@@ -158,7 +159,18 @@ import MusicKit
                 guard let next = try await batch.nextBatch(limit: 250 - entries.count), !next.isEmpty else { break }
                 entries.append(contentsOf: next.prefix(250 - entries.count)); batch = next; pages += 1
             }
-            self.playlistEntries = entries; self.loadedPlaylist = hydrated
+            self.log("playlistRelationshipRequest", ["playlistID": playlist.id.rawValue, "relationship": "tracks", "preferredSource": "library"])
+            let tracksPlaylist = try await playlist.with(.tracks, preferredSource: .library)
+            guard var tracksBatch = tracksPlaylist.tracks else { throw NSError(domain: "RhineProbe.MissingPlaylistTracks", code: 2) }
+            var tracks = Array(tracksBatch.prefix(250)); var trackPages = 1
+            while tracksBatch.hasNextBatch && tracks.count < 250 {
+                guard let next = try await tracksBatch.nextBatch(limit: 250 - tracks.count), !next.isEmpty else { break }
+                tracks.append(contentsOf: next.prefix(250 - tracks.count)); tracksBatch = next; trackPages += 1
+            }
+            let sameOrder = tracks.count == entries.count && zip(tracks, entries).allSatisfy { $0.0.title == $0.1.title && $0.0.artistName == $0.1.artistName }
+            self.log("playlistTracksResponse", ["count": tracks.count, "pages": trackPages, "hasNextBatch": tracksBatch.hasNextBatch, "sameOrderAsEntries": sameOrder, "rows": tracks.enumerated().map { ["ordinal": $0.offset, "libraryTrackID": $0.element.id.rawValue, "title": $0.element.title, "artist": $0.element.artistName, "hasPlayParameters": $0.element.playParameters != nil] }])
+            guard sameOrder else { throw NSError(domain: "RhineProbe.PlaylistOrderMismatch", code: 3) }
+            self.playlistEntries = entries; self.playlistTracks = tracks; self.loadedPlaylist = hydrated
             self.samples.isHidden = true; self.playlistScroll.isHidden = false; self.playlistTable.reloadData()
             if !entries.isEmpty { self.playlistTable.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false) }
             self.log("playlistRelationshipResponse", ["playlistID": hydrated.id.rawValue, "count": entries.count, "pages": pages, "hasNextBatch": batch.hasNextBatch, "rows": entries.enumerated().map { self.playlistSource($0.element, index: $0.offset) }])
@@ -180,27 +192,31 @@ import MusicKit
     @objc func playPlaylistRow() {
         let index = playlistTable.selectedRow
         guard playlistEntries.indices.contains(index), let playlist = loadedPlaylist else { return }
-        let entries = playlistEntries
-        startQueue(entries.map { MusicPlayer.Queue.Entry($0) }, sources: entries.enumerated().map { playlistSource($0.element, index: $0.offset) }, index: index, scope: "playlist:" + playlist.id.rawValue, playlist: playlist, playlistStart: entries[index])
+        let entries = playlistEntries, tracks = playlistTracks
+        guard tracks.count == entries.count else { return }
+        let sources: [[String: Any]] = entries.enumerated().map { index, entry in
+            var source = playlistSource(entry, index: index); source["libraryTrackID"] = tracks[index].id.rawValue; return source
+        }
+        startQueue(tracks.map { MusicPlayer.Queue.Entry($0) }, sources: sources, index: index, scope: "playlist:" + playlist.id.rawValue, tracks: tracks)
     }
     func play(index: Int) {
         guard songs.indices.contains(index) else { status.stringValue = "该位置没有样本；不得以单首冒充中间队列测试。"; return }
         let captured = songs
-        startQueue(captured.map { MusicPlayer.Queue.Entry($0) }, sources: captured.enumerated().map { ["ordinal": $0.offset, "libraryItemID": $0.element.id.rawValue, "title": $0.element.title] }, index: index, scope: sampleScope)
+        startQueue(captured.map { MusicPlayer.Queue.Entry($0) }, sources: captured.enumerated().map { ["ordinal": $0.offset, "libraryItemID": $0.element.id.rawValue, "title": $0.element.title] }, index: index, scope: sampleScope, sampleSongs: captured)
     }
-    func startQueue(_ entries: [MusicPlayer.Queue.Entry], sources: [[String: Any]], index: Int, scope: String, playlist: Playlist? = nil, playlistStart: Playlist.Entry? = nil) {
+    func startQueue(_ entries: [MusicPlayer.Queue.Entry], sources: [[String: Any]], index: Int, scope: String, tracks: [Track]? = nil, sampleSongs: [Song]? = nil) {
         guard !busy else { return }
         generation += 1; let ticket = generation; queueGeneration += 1; intent = "playing"
         queueSources = zip(sources, entries).map { source, entry in var row = source; row["inputQueueEntryID"] = entry.id; return row }
         lastMapping = nil
         run("原生队列播放") {
             let p = ApplicationMusicPlayer.shared; self.player = p
-            if let playlist, let playlistStart {
-                p.queue = ApplicationMusicPlayer.Queue(playlist: playlist, startingAt: playlistStart)
-            } else {
-                p.queue = ApplicationMusicPlayer.Queue(entries, startingAt: entries[index])
-            }
-            self.log("queueRequest", ["scope": scope, "constructor": playlist == nil ? "entries" : "playlist", "queueGeneration": self.queueGeneration, "commandGeneration": ticket, "sources": self.queueSources, "startIndex": index])
+            if let tracks {
+                p.queue = ApplicationMusicPlayer.Queue(for: tracks, startingAt: tracks[index])
+            } else if let sampleSongs {
+                p.queue = ApplicationMusicPlayer.Queue(for: sampleSongs, startingAt: sampleSongs[index])
+            } else { throw NSError(domain: "RhineProbe.MissingQueueSource", code: 4) }
+            self.log("queueRequest", ["scope": scope, "constructor": tracks == nil ? "librarySongs" : "libraryTracks", "queueGeneration": self.queueGeneration, "commandGeneration": ticket, "sources": self.queueSources, "startIndex": index])
             self.recordMapping()
             do { try await p.play() }
             catch { if ticket == self.generation { self.intent = "stopped" }; self.settle(ticket); throw error }
@@ -216,8 +232,7 @@ import MusicKit
     func enforceIntent() {
         guard let p = player else { return }
         if intent == "stopped" {
-            if p.state.playbackStatus == .playing || !p.queue.entries.isEmpty { p.stop() }
-            if !p.queue.entries.isEmpty { p.queue = ApplicationMusicPlayer.Queue([] as [MusicPlayer.Queue.Entry]); log("clearStoppedQueue", ["commandGeneration": generation]) }
+            if p.state.playbackStatus == .playing { p.stop(); log("reassertStop", ["commandGeneration": generation]) }
         } else if intent == "paused" && p.state.playbackStatus != .paused { p.pause() }
     }
     @objc func playMiddle() { play(index: 1) }
@@ -227,11 +242,11 @@ import MusicKit
         log("pause", ["commandGeneration": generation, "queueGeneration": queueGeneration]); poll()
     }
     @objc func stop() {
-        generation += 1; intent = "stopped"; operation?.cancel(); enforceIntent()
+        generation += 1; intent = "stopped"; operation?.cancel(); player?.stop(); enforceIntent()
         log("stop", ["commandGeneration": generation, "queueGeneration": queueGeneration]); poll()
     }
     @objc func resume() {
-        guard !busy, let p = player, !p.queue.entries.isEmpty else { return }
+        guard !busy, let p = player, !p.queue.entries.isEmpty, intent != "stopped" else { return }
         generation += 1; intent = "playing"; let ticket = generation
         run("继续播放") {
             do { try await p.play() } catch { if ticket == self.generation { self.intent = "stopped" }; self.settle(ticket); throw error }
