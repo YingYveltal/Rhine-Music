@@ -1,0 +1,102 @@
+{
+  "sourceCommit": "a546c351c727a4077e12a0813a81aaf376d0ec0f",
+  "executableSha256": "c4dd06a15aef49e8000fcf5472e72fe41420807ca6f57c3fc300d20c16f70c27",
+  "zipSha256": "223fa83efc31192dd5953f3f8eab447def3e72b37343c9cf97c2f95b7e673c71",
+  "artifactRoot": ".local/issue25-qa",
+  "artifacts": [
+    {
+      "file": "cancel.txt",
+      "sha256": "318bad49fc211e692b248688bf800845f794912048ebdebc528ea5de2ac42304"
+    },
+    {
+      "file": "daily-prerequisite.txt",
+      "sha256": "a03600767e241653cbe6f1916345ac836c4f16f4d5c5f074443d70ed51a950f4"
+    },
+    {
+      "file": "duplicate.txt",
+      "sha256": "d9874ed78098b923de3e70e444307e2391bfc825a0987ddd9b3dacd4d243b450"
+    },
+    {
+      "file": "initial-panel.txt",
+      "sha256": "64407e460458e6c4425db3d78978b475070213fcfde2025e9d3c779434e8bd0b"
+    },
+    {
+      "file": "launch-first.json",
+      "sha256": "2d43f92e657c3ac1649c056baadbdbd94cce454586f708f03863f8f27e4fb872"
+    },
+    {
+      "file": "launch.json",
+      "sha256": "3c757956a2b05fcd496977bf17bdd540bcb693c809b5535f92d68a1687b17359"
+    },
+    {
+      "file": "launch.log",
+      "sha256": "41fae9d74f121c65c1dc1b3a9c9de91da2b93196784805560780422fa9bf64fd"
+    },
+    {
+      "file": "library-after-scan.png",
+      "sha256": "2702e1760b521737c0a32c87ca353ef51e154882b60082988022980370ecd223"
+    },
+    {
+      "file": "library-panel.png",
+      "sha256": "23cb520a017013e75fac1eb4dbbd51ec1a7e466181c1a371f66847c7ff8c1148"
+    },
+    {
+      "file": "multi-added.txt",
+      "sha256": "1e54003628700d919c28486969996817e597994b071b15d7b94dd3284a444454"
+    },
+    {
+      "file": "multi-selected.png",
+      "sha256": "7881a49f48c7819cff4ed76f76897a55a236aceed65c29edac04e5bc6a1c2ab7"
+    },
+    {
+      "file": "multi-selected.txt",
+      "sha256": "65c2bfb9bad6b2e58f8423b968ef86c3f731fc4a9954b50bdfc5f9af6520319e"
+    },
+    {
+      "file": "persistence.json",
+      "sha256": "56efe438b6d1795f25a100514f015d3697a401ffbe11a59e49f6bf680ff0df94"
+    },
+    {
+      "file": "processes-before.json",
+      "sha256": "ba224bfd05bfc23b3f7b54b5cbbe3ad4893ec101d311b142d382a7ad5075c7dc"
+    },
+    {
+      "file": "restart-panel.txt",
+      "sha256": "7e7900f0bfbe2de9e7ad17559550fe0acef4fb8af8c483c31268e7a9062896cf"
+    },
+    {
+      "file": "restart-shelf.txt",
+      "sha256": "c73f5e4d52f7f967a0230fdd0f7fa6bee3a3e9a13c4fbb4dfcafef3efc15d419"
+    },
+    {
+      "file": "restart.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "review.md",
+      "sha256": "ef3109619fa7a8ca3d1f5d4b14077783fe0f87013de1f186c284c848d3c01fcd"
+    },
+    {
+      "file": "runtime-after-restart.json",
+      "sha256": "284372c7b477762dbf813b468c8220aa14fa89403c03e50b8f1911b441b0d06d"
+    },
+    {
+      "file": "runtime.json",
+      "sha256": "284372c7b477762dbf813b468c8220aa14fa89403c03e50b8f1911b441b0d06d"
+    },
+    {
+      "file": "saved-roots.txt",
+      "sha256": "ec9fddff34acce1484146159b84894af02257c6e14345861b2f1cb08ab6e0292"
+    },
+    {
+      "file": "scan-complete.txt",
+      "sha256": "260fb70ff9ab785fbd952e7689d42da36fb60937be8d34d7d3cdae607e19e85f"
+    },
+    {
+      "file": "single-add.txt",
+      "sha256": "aa709f930aab550753b883a5d3b4ae06cb5535a4920650914210c4e050592bdf"
+    }
+  ],
+  "status": "folder-picker-scan-restart-passed; QQ disconnected and daily prerequisite observed; other QQ states unit-tested only",
+  "qaLeftOpenForCoordinator": 10693
+}
