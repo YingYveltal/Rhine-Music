@@ -1,6 +1,6 @@
 # Issue #33：当前 Preview 掉帧定位与文字布局候选
 
-本轮在用户实际运行的 Preview 中复现低帧率；玻璃背面深度候选没有稳定收益，保持关闭。新候选改为批量测量详情文字遮罩，针对多轮重复出现的 CPU 尖峰；**新候选尚未打包或实测，也不保证解决持续渲染低帧率**。任务见 [#33](https://github.com/YingYveltal/Rhine-Music/issues/33)。
+本轮在用户实际运行的 Preview 中复现低帧率；玻璃背面深度候选没有稳定收益，保持关闭。新候选改为批量测量详情文字遮罩，针对多轮重复出现的 CPU 尖峰；**新候选已通过构建，真实运行验证被系统钥匙串读取阻塞；尚无提速结论，也不保证解决持续渲染低帧率**。任务见 [#33](https://github.com/YingYveltal/Rhine-Music/issues/33)。
 
 ## 当前包的有界实测
 
@@ -36,14 +36,20 @@ Apple M4 / Mac16,10、macOS 26.3.1(a)。实际窗口内容 1280×788、DPR 2、�
 
 `DocumentDecryption.batchLayout` 默认 false。候选先给全部目标加原有定位 class，再一次性读取全部文本片段，最后统一挂载遮罩。原坐标计算、行合并、DOM 顺序、0.35 秒等待、0.95 秒擦除及每行 easing 均保留；不改材质、分辨率、文字内容或动画时长。范围限消除重复布局失效，不会仅凭这个候选承诺持续 60 FPS。
 
-仅显式 `VITE_RENDER_WORK_QA=1` 的诊断构建提供 Ctrl+Option+L 单变量切换；测量期间拒绝切换，普通构建没有该入口。每轮 metadata 记录 `batchedDocumentLayout`；默认产品仍走原实现。
+仅显式 `VITE_RENDER_WORK_QA=1` 的诊断构建提供 Ctrl+Option+L 单变量切换；测量及回放等待启动期间拒绝切换，普通构建没有该入口。每轮 metadata 记录 `batchedDocumentLayout`；默认产品仍走原实现。
 
 现有 B/M/J 测量开始后才开启细分时钟，结束后关闭。raw 增加 RAF 相对时间及场景更新、图集上传提交、分辨率策略/重建、渲染提交、出场盒数量和封面缓存计数；另记文字遮罩重建与曲库 JSON 比较。图集 byte 计数不包含完整选中封面的 GPU 上传，其真实上传可能发生在 renderSubmission 内；异步解码本身仍未直接计时。`interval` 是上一回调到本回调，`work` 是本回调工作，不能按同一下标误当同一 GPU 帧。全部 CPU 墙钟数值，没有新增读回屏障。
 
-纯离线 5 项检查通过：候选与原版在模拟多行/缩放文本上的遮罩位置及逐时刻动画一致、重复 refresh 与减少动态效果正确；模拟布局失效从多次降为一次；测量启停、时间戳、旧帧排除与后台标记有效。模拟 DOM 不能证明真实 WebKit 的像素/耗时。TypeScript/生产构建、真实 A/A–A/B、两主题/长歌单换行与快速反向切换均待下次设备时段；不得拿当前包的旧报告验收新代码。
+纯离线 5 项检查通过：候选与原版在模拟多行/缩放文本上的遮罩位置及逐时刻动画一致、重复 refresh 与减少动态效果正确；模拟布局失效从多次降为一次；测量启停、时间戳、旧帧排除与后台标记有效。模拟 DOM 不能证明真实 WebKit 的像素/耗时。新增检查加现有原生播放器和 Apple 面板共 21 项检查通过，TypeScript 与生产构建通过。诊断构建还记录实际遮罩矩形（不含文字与曲库身份），用于后续核对换行和位置。真实 A/A–A/B、两主题/长歌单换行与快速反向切换尚未完成；不得拿当前包的旧报告验收新代码。
 
 下一次先在同一候选包里直接测 `show-menu` 耗时与相邻 RAF 长帧，并做代表性两主题画面对照，再做小规模交错 A/B。若文字重排并非尖峰或收益未超过 A/A 波动，保留默认 false，不为结果继续更换画质。持续渲染低帧率仍是独立待解决项。
 
+## 组合诊断包与运行阻塞
+
+已合入 Apple Music 组合 `87cf04e34aaadd8091fec5932ebd4512d8ad0ac0`；它与后来合并的 main `362ae54dcff8f877f43d4b4f9cfad1e6305f2357` 内容树一致。诊断包源 `6f998b0201d22f0bcadc7b857ca11d8bab55c691`，主程序 SHA-256 `6a9bef97c22a3311ee7953e0707d7086866989f1b5fadc4943cfa8484b242c29`；以 `VITE_RENDER_WORK_QA=1` 构建，保留正常 Preview 身份与数据，签名验证通过。包位于本工作树 `.local/issue33-diagnostic/Rhine Music Preview.app`，同目录 `manifest.json` 记录来源与散列。之后同步 main 祖先及文档不代表重新构建，运行证据仍应绑定上述包源。
+
+启动后未获得可交互窗口。只读进程采样显示主线程在 `qq_session::Keychain::load → SecItemCopyMatching` 等待；这证明启动受钥匙串读取阻塞，不能证明已经显示认证提示，更不是新的渲染测量结果。UI 工具访问 `com.apple.SecurityAgent` 被明确拒绝：`Computer Use is not allowed to use the app 'com.apple.SecurityAgent' for safety reasons.` 已停止访问该认证界面，未使用替代途径、修改凭据或更换身份。等待用户自行处理系统提示后，再协调设备时段继续。
+
 ## 资源与清理
 
-本轮未安装依赖、未新建 app/target/cache，没有可删除的过期构建。仅需保留上述原始测量与当前分支；此前 #31 的 node_modules（109 MiB）/dist（37 MiB）由总控决定，已要求为未合并组合验证保留。本任务不清理共享缓存、稳定版、当前试用版、用户数据或未合并代码。
+安装了本工作树依赖，并复用总控批准的 #30 Cargo target 完成一次诊断构建，未新建 Cargo 缓存。保留该诊断包、manifest 与 `.local/issue33-evidence/combined` 启动/构建证据；尚未产生新性能报告。空等期间已释放 GUI/GPU/构建窗口。此前 #31 的依赖和构建产物由总控协调；不清理共享缓存、稳定版、当前试用版、用户数据或未合并代码。
