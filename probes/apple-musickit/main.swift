@@ -3,7 +3,7 @@ import MusicKit
 
 // A bounded native MusicKit experiment. No catalog, subscription preflight,
 // developer-token provider, Apple Events or accessibility automation.
-@MainActor final class Probe: NSObject, NSApplicationDelegate {
+@MainActor final class Probe: NSObject, NSApplicationDelegate, NSTableViewDataSource {
     var window: NSWindow!
     var status: NSTextField!
     var samples: NSTextField!
@@ -16,6 +16,17 @@ import MusicKit
     var player: ApplicationMusicPlayer?
     var busy = false
     var generation = 0
+    var queueGeneration = 0
+    var intent = "stopped"
+    var operation: Task<Void, Never>?
+    var playlistMenu: NSPopUpButton!
+    var playlistTable: NSTableView!
+    var playlistScroll: NSScrollView!
+    var playlists: [Playlist] = []
+    var playlistEntries: [Playlist.Entry] = []
+    var loadedPlaylist: Playlist?
+    var queueSources: [[String: Any]] = []
+    var lastMapping: Data?
     var logURL: URL!
 
     func log(_ event: String, _ data: [String: Any] = [:]) {
@@ -49,25 +60,35 @@ import MusicKit
         let directory = Bundle.main.object(forInfoDictionaryKey: "RhineProbeEvidenceDirectory") as! String
         try? FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
         logURL = URL(fileURLWithPath: directory).appendingPathComponent("events.jsonl")
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 980, height: 660), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 820), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Rhine Apple Music Probe · MusicKit"
-        label("MusicKit 原生本机验证", NSRect(x: 20, y: 605, width: 940, height: 30)).font = .boldSystemFont(ofSize: 23)
-        label("先授权和读取有限样本；播放前确保 Music 与 QQ 已停止。本模式维护独立队列，不遥控 Music.app。", NSRect(x: 20, y: 562, width: 940, height: 36))
-        button("查看授权状态", #selector(authStatus), NSRect(x: 20, y: 508, width: 150, height: 32))
-        button("请求音乐资料库授权", #selector(authorize), NSRect(x: 180, y: 508, width: 200, height: 32))
-        button("读取已下载（最多3首）", #selector(readDownloaded), NSRect(x: 395, y: 508, width: 255, height: 32))
-        button("读取现有库（最多3首）", #selector(readLibrary), NSRect(x: 665, y: 508, width: 280, height: 32))
-        status = label("尚未请求授权", NSRect(x: 20, y: 450, width: 940, height: 46))
-        samples = label("尚未读取样本。下载筛选不等于证明无 DRM；未核对来源的样本会保持未知。", NSRect(x: 20, y: 270, width: 940, height: 175))
-        button("样本队列从第2首开始", #selector(playMiddle), NSRect(x: 20, y: 215, width: 230, height: 34))
-        button("播放首个样本", #selector(playFirst), NSRect(x: 260, y: 215, width: 150, height: 34))
-        button("暂停", #selector(pause), NSRect(x: 420, y: 215, width: 100, height: 34), lockedWhileBusy: false)
-        button("继续", #selector(resume), NSRect(x: 530, y: 215, width: 100, height: 34))
-        button("停止", #selector(stop), NSRect(x: 640, y: 215, width: 100, height: 34), lockedWhileBusy: false)
-        button("下一首", #selector(next), NSRect(x: 750, y: 215, width: 100, height: 34))
-        seek = NSTextField(frame: NSRect(x: 20, y: 166, width: 125, height: 28)); seek.stringValue = "60"; seek.setAccessibilityLabel("定位秒数"); window.contentView!.addSubview(seek)
-        button("定位秒数", #selector(seekTo), NSRect(x: 160, y: 164, width: 125, height: 32))
-        now = label("播放器尚未创建；读取曲库成功不等于可播放订阅歌曲。", NSRect(x: 20, y: 25, width: 940, height: 120))
+        label("MusicKit 原生本机验证", NSRect(x: 20, y: 765, width: 940, height: 30)).font = .boldSystemFont(ofSize: 23)
+        label("先授权和读取有限样本；播放前确保 Music 与 QQ 已停止。本模式维护独立队列，不遥控 Music.app。", NSRect(x: 20, y: 722, width: 940, height: 36))
+        button("查看授权状态", #selector(authStatus), NSRect(x: 20, y: 668, width: 150, height: 32))
+        button("请求音乐资料库授权", #selector(authorize), NSRect(x: 180, y: 668, width: 200, height: 32))
+        button("读取已下载（最多3首）", #selector(readDownloaded), NSRect(x: 395, y: 668, width: 255, height: 32))
+        button("读取现有库（最多3首）", #selector(readLibrary), NSRect(x: 665, y: 668, width: 280, height: 32))
+        button("读取已有歌单（最多10个）", #selector(readPlaylists), NSRect(x: 20, y: 565, width: 245, height: 32))
+        playlistMenu = NSPopUpButton(frame: NSRect(x: 275, y: 565, width: 335, height: 32)); window.contentView!.addSubview(playlistMenu)
+        button("读取所选歌单顺序", #selector(readPlaylistEntries), NSRect(x: 620, y: 565, width: 190, height: 32))
+        button("从所选歌单行播放", #selector(playPlaylistRow), NSRect(x: 820, y: 565, width: 200, height: 32))
+        playlistTable = NSTableView(frame: .zero); playlistTable.dataSource = self; playlistTable.rowHeight = 25
+        for (index, pair) in [("顺序",60.0),("曲目",440.0),("艺人",290.0),("时长",160.0)].enumerated() {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(String(index))); column.title = pair.0; column.width = pair.1; playlistTable.addTableColumn(column)
+        }
+        playlistScroll = NSScrollView(frame: NSRect(x: 20, y: 315, width: 1000, height: 240)); playlistScroll.documentView = playlistTable; playlistScroll.hasVerticalScroller = true; playlistScroll.isHidden = true; window.contentView!.addSubview(playlistScroll)
+        button("上一首", #selector(previous), NSRect(x: 860, y: 260, width: 100, height: 34))
+        status = label("尚未请求授权", NSRect(x: 20, y: 610, width: 940, height: 46))
+        samples = label("尚未读取样本。下载筛选不等于证明无 DRM；未核对来源的样本会保持未知。", NSRect(x: 20, y: 315, width: 940, height: 240))
+        button("样本队列从第2首开始", #selector(playMiddle), NSRect(x: 20, y: 260, width: 230, height: 34))
+        button("播放首个样本", #selector(playFirst), NSRect(x: 260, y: 260, width: 150, height: 34))
+        button("暂停", #selector(pause), NSRect(x: 420, y: 260, width: 100, height: 34), lockedWhileBusy: false)
+        button("继续", #selector(resume), NSRect(x: 530, y: 260, width: 100, height: 34))
+        button("停止", #selector(stop), NSRect(x: 640, y: 260, width: 100, height: 34), lockedWhileBusy: false)
+        button("下一首", #selector(next), NSRect(x: 750, y: 260, width: 100, height: 34))
+        seek = NSTextField(frame: NSRect(x: 20, y: 211, width: 125, height: 28)); seek.stringValue = "60"; seek.setAccessibilityLabel("定位秒数"); window.contentView!.addSubview(seek)
+        button("定位秒数", #selector(seekTo), NSRect(x: 160, y: 209, width: 125, height: 32))
+        now = label("播放器尚未创建；读取曲库成功不等于可播放订阅歌曲。", NSRect(x: 20, y: 40, width: 1000, height: 150))
         let menu = NSMenu(), item = NSMenuItem(), sub = NSMenu(); sub.addItem(withTitle: "退出探针", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"); item.submenu = sub; menu.addItem(item); NSApp.mainMenu = menu
         window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         log("launch", ["bundleID": Bundle.main.bundleIdentifier ?? "", "os": ProcessInfo.processInfo.operatingSystemVersionString, "mode": "nativeMusicKit", "authorization": MusicAuthorization.currentStatus.rawValue])
@@ -76,8 +97,8 @@ import MusicKit
     }
     func run(_ event: String, work: @escaping @MainActor () async throws -> Void) {
         guard !busy else { return }; busy = true; controls.forEach { $0.isEnabled = false }; status.stringValue = event + "…"
-        Task { @MainActor in
-            defer { busy = false; controls.forEach { $0.isEnabled = true } }
+        operation = Task { @MainActor in
+            defer { busy = false; operation = nil; controls.forEach { $0.isEnabled = true } }
             log(event + ".begin")
             do { try await work(); log(event + ".end", ["ok": true]); status.stringValue = event + "完成" }
             catch { let codes = errorCodes(error); log(event + ".end", ["ok": false, "errors": codes]); status.stringValue = event + "失败：" + codes.map { "\($0["domain"] ?? "") / \($0["code"] ?? "")" }.joined(separator: " → ") }
@@ -96,6 +117,7 @@ import MusicKit
     func read(_ downloaded: Bool) {
         guard MusicAuthorization.currentStatus == .authorized else { authStatus(); return }
         run(downloaded ? "读取已下载样本" : "读取现有库样本") {
+            self.playlistScroll.isHidden = true; self.samples.isHidden = false
             self.songs = []; self.samples.stringValue = "正在读取…"
             var request = MusicLibraryRequest<Song>(); request.limit = 3; request.includeOnlyDownloadedContent = downloaded
             self.log("libraryRequest", ["downloadedOnly": downloaded, "limit": 3])
@@ -111,37 +133,144 @@ import MusicKit
     }
     @objc func readDownloaded() { read(true) }
     @objc func readLibrary() { read(false) }
+    @objc func readPlaylists() {
+        guard MusicAuthorization.currentStatus == .authorized else { authStatus(); return }
+        run("读取已有歌单") {
+            var request = MusicLibraryRequest<Playlist>(); request.limit = 10
+            self.log("playlistsRequest", ["limit": 10])
+            let result = try await request.response()
+            self.playlists = Array(result.items.prefix(10))
+            self.playlistMenu.removeAllItems(); self.playlistMenu.addItems(withTitles: self.playlists.map(\.name))
+            self.log("playlistsResponse", ["hasNextBatch": result.items.hasNextBatch, "rows": self.playlists.map { ["id": $0.id.rawValue, "name": $0.name] }])
+        }
+    }
+    @objc func readPlaylistEntries() {
+        let index = playlistMenu.indexOfSelectedItem
+        guard playlists.indices.contains(index) else { return }
+        let playlist = playlists[index]
+        run("读取歌单条目") {
+            self.playlistEntries = []; self.loadedPlaylist = nil; self.playlistTable.reloadData()
+            self.log("playlistRelationshipRequest", ["playlistID": playlist.id.rawValue, "relationship": "entries", "preferredSource": "library"])
+            let hydrated = try await playlist.with(.entries, preferredSource: .library)
+            guard var batch = hydrated.entries else { throw NSError(domain: "RhineProbe.MissingPlaylistEntries", code: 1) }
+            var entries = Array(batch.prefix(250)); var pages = 1
+            while batch.hasNextBatch && entries.count < 250 {
+                guard let next = try await batch.nextBatch(limit: 250 - entries.count), !next.isEmpty else { break }
+                entries.append(contentsOf: next.prefix(250 - entries.count)); batch = next; pages += 1
+            }
+            self.playlistEntries = entries; self.loadedPlaylist = hydrated
+            self.samples.isHidden = true; self.playlistScroll.isHidden = false; self.playlistTable.reloadData()
+            if !entries.isEmpty { self.playlistTable.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false) }
+            self.log("playlistRelationshipResponse", ["playlistID": hydrated.id.rawValue, "count": entries.count, "pages": pages, "hasNextBatch": batch.hasNextBatch, "rows": entries.enumerated().map { self.playlistSource($0.element, index: $0.offset) }])
+        }
+    }
+    func playlistSource(_ entry: Playlist.Entry, index: Int) -> [String: Any] {
+        ["ordinal": index, "playlistEntryID": entry.id.rawValue, "libraryItemID": entry.item?.id.rawValue ?? "", "position": entry.position, "title": entry.title, "artist": entry.artistName, "duration": entry.duration ?? 0]
+    }
+    func numberOfRows(in tableView: NSTableView) -> Int { playlistEntries.count }
+    func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int) -> Any? {
+        let entry = playlistEntries[row]
+        switch tableColumn?.identifier.rawValue {
+        case "0": return row + 1
+        case "1": return entry.title
+        case "2": return entry.artistName
+        default: return String(format: "%.2f", entry.duration ?? 0)
+        }
+    }
+    @objc func playPlaylistRow() {
+        let index = playlistTable.selectedRow
+        guard playlistEntries.indices.contains(index), let playlist = loadedPlaylist else { return }
+        let entries = playlistEntries
+        startQueue(entries.map { MusicPlayer.Queue.Entry($0) }, sources: entries.enumerated().map { playlistSource($0.element, index: $0.offset) }, index: index, scope: "playlist:" + playlist.id.rawValue)
+    }
     func play(index: Int) {
         guard songs.indices.contains(index) else { status.stringValue = "该位置没有样本；不得以单首冒充中间队列测试。"; return }
-        let captured = songs, scope = sampleScope; generation += 1; let ticket = generation
+        let captured = songs
+        startQueue(captured.map { MusicPlayer.Queue.Entry($0) }, sources: captured.enumerated().map { ["ordinal": $0.offset, "libraryItemID": $0.element.id.rawValue, "title": $0.element.title] }, index: index, scope: sampleScope)
+    }
+    func startQueue(_ entries: [MusicPlayer.Queue.Entry], sources: [[String: Any]], index: Int, scope: String) {
+        guard !busy else { return }
+        generation += 1; let ticket = generation; queueGeneration += 1; intent = "playing"
+        queueSources = zip(sources, entries).map { source, entry in var row = source; row["inputQueueEntryID"] = entry.id; return row }
+        lastMapping = nil
         run("原生队列播放") {
             let p = ApplicationMusicPlayer.shared; self.player = p
-            p.queue = ApplicationMusicPlayer.Queue(for: captured, startingAt: captured[index])
-            self.log("queueRequest", ["scope": scope, "ids": captured.map { $0.id.rawValue }, "startIndex": index, "startID": captured[index].id.rawValue])
-            try await p.play()
-            if ticket != self.generation { p.stop(); self.log("cancelledLatePlayback"); return }
-            self.poll()
+            p.queue = ApplicationMusicPlayer.Queue(entries, startingAt: entries[index])
+            self.log("queueRequest", ["scope": scope, "queueGeneration": self.queueGeneration, "commandGeneration": ticket, "sources": self.queueSources, "startIndex": index])
+            self.recordMapping()
+            do { try await p.play() }
+            catch { if ticket == self.generation { self.intent = "stopped" }; self.settle(ticket); throw error }
+            self.settle(ticket); self.recordMapping(); self.poll()
         }
+    }
+    // Every async playback command returns through the same latest-intent barrier.
+    // A late SDK completion can still have transient effects; logs/tests bound that risk.
+    func settle(_ ticket: Int) {
+        if ticket != generation { log("staleCommandCompletion", ["ticket": ticket, "latest": generation, "intent": intent]) }
+        enforceIntent()
+    }
+    func enforceIntent() {
+        guard let p = player else { return }
+        if intent == "stopped" {
+            if p.state.playbackStatus == .playing || !p.queue.entries.isEmpty { p.stop() }
+            if !p.queue.entries.isEmpty { p.queue = ApplicationMusicPlayer.Queue([] as [MusicPlayer.Queue.Entry]); log("clearStoppedQueue", ["commandGeneration": generation]) }
+        } else if intent == "paused" && p.state.playbackStatus != .paused { p.pause() }
     }
     @objc func playMiddle() { play(index: 1) }
     @objc func playFirst() { play(index: 0) }
-    @objc func pause() { generation += 1; player?.pause(); log("pause"); poll() }
-    @objc func stop() { generation += 1; player?.stop(); log("stop"); poll() }
-    @objc func resume() {
-        guard let p = player else { return }; generation += 1; let ticket = generation
-        run("继续播放") { try await p.play(); if ticket != self.generation { p.stop(); self.log("cancelledLatePlayback") } }
+    @objc func pause() {
+        generation += 1; intent = "paused"; operation?.cancel(); player?.pause()
+        log("pause", ["commandGeneration": generation, "queueGeneration": queueGeneration]); poll()
     }
-    @objc func next() { guard let p = player else { return }; run("下一首") { try await p.skipToNextEntry() } }
+    @objc func stop() {
+        generation += 1; intent = "stopped"; operation?.cancel(); enforceIntent()
+        log("stop", ["commandGeneration": generation, "queueGeneration": queueGeneration]); poll()
+    }
+    @objc func resume() {
+        guard !busy, let p = player, !p.queue.entries.isEmpty else { return }
+        generation += 1; intent = "playing"; let ticket = generation
+        run("继续播放") {
+            do { try await p.play() } catch { if ticket == self.generation { self.intent = "stopped" }; self.settle(ticket); throw error }
+            self.settle(ticket)
+        }
+    }
+    func skip(_ forward: Bool) {
+        guard !busy, let p = player, !p.queue.entries.isEmpty, intent != "stopped" else { return }
+        generation += 1; let ticket = generation
+        run(forward ? "下一首" : "上一首") {
+            self.log("skipRequest", ["forward": forward, "commandGeneration": ticket, "queueGeneration": self.queueGeneration])
+            do { if forward { try await p.skipToNextEntry() } else { try await p.skipToPreviousEntry() } }
+            catch { self.settle(ticket); throw error }
+            self.settle(ticket)
+        }
+    }
+    @objc func next() { skip(true) }
+    @objc func previous() { skip(false) }
     @objc func seekTo() {
-        guard let p = player, let time = Double(seek.stringValue), time.isFinite, time >= 0 else { return }
-        p.playbackTime = time; log("seek", ["seconds": time]); poll()
+        guard !busy, let p = player, intent != "stopped", let time = Double(seek.stringValue), time.isFinite, time >= 0 else { return }
+        generation += 1; p.playbackTime = time; log("seek", ["seconds": time, "commandGeneration": generation]); poll()
+    }
+    func recordMapping() {
+        guard let p = player else { return }
+        let rows: [[String: Any]] = p.queue.entries.enumerated().map { index, entry in
+            var row: [String: Any] = ["runtimeOrdinal": index, "entryID": entry.id, "resolvedItemID": entry.item?.id.rawValue ?? "", "observedTitle": entry.title]
+            if queueSources.indices.contains(index) { row["constructorSource"] = queueSources[index] }
+            return row
+        }
+        let mapping: [String: Any] = ["queueGeneration": queueGeneration, "commandGeneration": generation, "sourceCount": queueSources.count, "observedCount": rows.count, "rows": rows]
+        let data = try? JSONSerialization.data(withJSONObject: mapping, options: [.sortedKeys])
+        if data != lastMapping { log("queueMapping", mapping); lastMapping = data }
     }
     func poll() {
         guard let p = player else { return }
+        // No EOF inference or play command is issued here. Only explicit Pause/Stop
+        // intent is re-applied if an in-flight SDK operation finishes late.
+        if intent != "playing" { enforceIntent() }
+        recordMapping()
         let entry = p.queue.currentEntry, state = String(describing: p.state.playbackStatus), time = p.playbackTime
         let id = entry?.item?.id.rawValue ?? "", title = entry?.title ?? ""
-        log("player", ["state": state, "position": time.isFinite ? time : 0, "entryID": entry?.id ?? "", "songID": id, "title": title, "prepared": p.isPreparedToPlay])
-        now.stringValue = "\(state) · \(String(format: "%.2f", time)) 秒\n\(title)\n条目 \(entry?.id ?? "—") / 歌曲 \(id)"
+        log("player", ["state": state, "position": time.isFinite ? time : 0, "entryID": entry?.id ?? "", "songID": id, "title": title, "prepared": p.isPreparedToPlay, "queueGeneration": queueGeneration, "commandGeneration": generation, "intent": intent, "shuffle": p.state.shuffleMode.map { String(describing: $0) } ?? "unknown", "repeat": p.state.repeatMode.map { String(describing: $0) } ?? "unknown"])
+        now.stringValue = "意图 \(intent) / 原生 \(state) · \(String(format: "%.2f", time)) 秒\n\(title)\n条目 \(entry?.id ?? "—") / 歌曲 \(id)"
     }
     func applicationWillTerminate(_ notification: Notification) { player?.stop(); log("quit") }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
