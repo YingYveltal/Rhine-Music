@@ -302,7 +302,7 @@ mod tests {
         native.take("play").send(Ok(native_state("playing"))).unwrap();d.advance();
         d.accept(Envelope{receipt:2,command:Command::DisableQq});d.advance();
         assert_eq!(d.applied,2);assert!(native.requests.lock().unwrap().is_empty());
-        assert_eq!(d.snapshot()["playing"],true);
+        assert_eq!(d.apple_state["playing"],true);
         d.accept(Envelope{receipt:3,command:apple_play()});
         let obsolete_stop=native.take("stop");
         d.accept(Envelope{receipt:4,command:Command::DisableApple});
