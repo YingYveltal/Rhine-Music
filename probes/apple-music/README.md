@@ -17,3 +17,9 @@ python3 probes/apple-music/build.py
 接口依据：本机 `/System/Applications/Music.app/Contents/Resources/com.apple.Music.sdef`；Apple [SBApplication](https://developer.apple.com/documentation/scriptingbridge/sbapplication)、[自动化用途说明](https://developer.apple.com/documentation/bundleresources/information-property-list/nsappleeventsusagedescription)和 [Apple Events entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.automation.apple-events)。手写声明只覆盖实际读取及播放控制的公开字典方法，没有外部脚本执行或 UI 自动化代码。
 
 4c5a3c4 原型已在正常授权后验证订阅曲目、原型自行建立歌单队列、前后切歌、定位及尾段自动续播。中间单曲点播会清空后续队列，是确定限制；实际出声仍须用户确认。版本/哈希、最小接入判断和未覆盖项见 [本轮报告](../../docs/APPLE-MUSIC-PROBE.md)。
+
+## Issue #28 实验对照
+
+下方下拉菜单可选择公开事件的嵌套序号、即时 Scripting Bridge 引用、旧对象、省略 once、歌单 subject、对象 playOnce 和范围引用。这些是**诊断实验，不是已实现的连续点播功能**。尤其范围候选实际落到范围最后一首，不能用于正常听歌。默认嵌套序号方案也未建立后续队列。
+
+[连续点播报告](../../docs/APPLE-MUSIC-CONTINUOUS-QUEUE.md)记录两个干净构建、失败反例、同版本整张歌单正向对照和未覆盖项。已有曲库索引变化、快速命令竞争及非原子状态采样尚未处理，不能直接将这个探针当作产品后端。

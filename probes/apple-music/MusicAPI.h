@@ -8,6 +8,7 @@
 @property(readonly) NSString *kind;
 @property(readonly) double duration;
 @property(readonly) NSInteger cloudStatus;
+- (void)playOnce:(BOOL)once;
 @end
 @interface RMPlaylist : SBObject
 @property(readonly) NSString *name;
@@ -16,6 +17,9 @@
 @end
 @interface RMMusic : SBApplication
 @property(readonly) NSString *version;
+@property(readonly) BOOL fixedIndexing,shuffleEnabled;
+@property(readonly) NSInteger songRepeat;
+@property(readonly) RMPlaylist *currentPlaylist;
 @property(readonly) NSInteger playerState;
 @property double playerPosition;
 @property(readonly) RMTrack *currentTrack;
