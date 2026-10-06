@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import "MusicAPI.h"
+#import <Carbon/Carbon.h>
 
 static NSString *FourCC(NSInteger code) {
     char s[5]={(code>>24)&255,(code>>16)&255,(code>>8)&255,code&255,0};
@@ -76,7 +77,7 @@ static NSString *Cloud(NSInteger code) {
     self.seek=[[NSTextField alloc] initWithFrame:NSMakeRect(100,110,100,28)];self.seek.stringValue=@"60";self.seek.accessibilityLabel=@"定位秒数";[self.window.contentView addSubview:self.seek];
     [self button:@"跳转" action:@selector(seekTo:) frame:NSMakeRect(210,109,85,30) control:YES];
     self.variant=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(320,109,680,30) pullsDown:NO];
-    [self.variant addItemsWithTitles:@[@"原始 Apple Event：歌单内序号引用",@"Scripting Bridge：重新获取歌单内引用",@"旧版：已读取的曲目对象"]];
+    [self.variant addItemsWithTitles:@[@"原始 Apple Event：歌单内序号引用",@"Scripting Bridge：重新获取歌单内引用",@"旧版：已读取的曲目对象",@"原始事件：省略 once",@"原始事件：歌单 subject",@"曲目对象：playOnce",@"原始事件：所选至末尾范围"]];
     [self.window.contentView addSubview:self.variant];
     self.now=[self label:@"尚未读取播放状态。命令成功不代表已经出声，需同时观察实际进度并确认听感。" frame:NSMakeRect(20,20,1000,75)];
     NSMenu *menu=NSMenu.new;NSMenuItem *app=NSMenuItem.new;[menu addItem:app];NSMenu *submenu=NSMenu.new;[submenu addItemWithTitle:@"退出探针" action:@selector(terminate:) keyEquivalent:@"q"];app.submenu=submenu;NSApp.mainMenu=menu;
@@ -112,6 +113,8 @@ static NSString *Cloud(NSInteger code) {
             [self log:@"automationRequest" data:@{@"status":@(permission)}];
         }
         if(permission!=noErr){self.lastError=[NSError errorWithDomain:NSOSStatusErrorDomain code:permission userInfo:@{NSLocalizedDescriptionKey:@"Music.app 自动化尚未获准；请正常处理系统提示或检查自动化设置。"}];return;}
+        [self log:@"preferences" data:@{@"fixedIndexing":@(self.music.fixedIndexing),@"shuffle":@(self.music.shuffleEnabled),@"repeat":FourCC(self.music.songRepeat)}];
+        if(self.lastError)return;
         [self log:@"readingVersion" data:@{}];
         NSString *version=self.music.version;if(self.lastError)return;
         items=[[self.music playlists] get];
@@ -165,23 +168,36 @@ static NSAppleEventDescriptor *Indexed(DescType type, NSInteger index, NSAppleEv
     RMTrack *track=self.tracks[row];
     [self run:@"播放所选" work:^{
         [self log:@"selectionRequest" data:@{@"variant":@(variant),@"playlistIndex":@(playlist+1),@"trackIndex":@(row+1),@"expected":self.rows[row]}];
-        if(variant==0){
+        if(variant==0||variant==3||variant==4||variant==6){
             NSAppleEventDescriptor *list=Indexed('cPly',playlist+1,[NSAppleEventDescriptor nullDescriptor]);
             NSAppleEventDescriptor *item=Indexed('cTrk',row+1,list);
+            if(variant==6){
+                NSAppleEventDescriptor *range=[NSAppleEventDescriptor recordDescriptor];
+                [range setDescriptor:Indexed('cTrk',row+1,[NSAppleEventDescriptor descriptorWithDescriptorType:typeCurrentContainer bytes:NULL length:0]) forKeyword:keyAERangeStart];
+                [range setDescriptor:Indexed('cTrk',self.rows.count,[NSAppleEventDescriptor descriptorWithDescriptorType:typeCurrentContainer bytes:NULL length:0]) forKeyword:keyAERangeStop];
+                [item setDescriptor:[NSAppleEventDescriptor descriptorWithEnumCode:formRange] forKeyword:keyAEKeyForm];
+                [item setDescriptor:[range coerceToDescriptorType:typeRangeDescriptor] forKeyword:keyAEKeyData];
+            }
             NSAppleEventDescriptor *event=[NSAppleEventDescriptor appleEventWithEventClass:'hook' eventID:'Play' targetDescriptor:[NSAppleEventDescriptor descriptorWithBundleIdentifier:@"com.apple.Music"] returnID:kAutoGenerateReturnID transactionID:kAnyTransactionID];
             [event setParamDescriptor:item forKeyword:keyDirectObject];
-            [event setParamDescriptor:[NSAppleEventDescriptor descriptorWithBoolean:NO] forKeyword:'POne'];
+            if(variant!=3)[event setParamDescriptor:[NSAppleEventDescriptor descriptorWithBoolean:NO] forKeyword:'POne'];
+            if(variant==4)[event setAttributeDescriptor:list forKeyword:keySubjectAttr];
             NSError *error=nil;
             NSAppleEventDescriptor *reply=[event sendEventWithOptions:NSAppleEventSendWaitForReply timeout:30 error:&error];
             [self log:@"rawPlayReply" data:@{@"request":event.description,@"reply":reply.description?:@"",@"transportError":error.localizedDescription?:@""}];
             self.lastError=error;
             NSInteger code=[[reply paramDescriptorForKeyword:keyErrorNumber] int32Value];
             if(code)self.lastError=[NSError errorWithDomain:NSOSStatusErrorDomain code:code userInfo:@{NSLocalizedDescriptionKey:[reply paramDescriptorForKeyword:keyErrorString].stringValue?:@"Music rejected play"}];
-        }else if(variant==1){
+        }else if(variant==1||variant==5){
             RMPlaylist *list=[self.music playlists][playlist];
             RMTrack *nested=list.tracks[row];
             [self log:@"bridgeReference" data:@{@"playlist":list.description,@"track":nested.description}];
-            [self.music play:nested once:NO];
+            if(variant==5){
+                BOOL supported=[nested respondsToSelector:@selector(playOnce:)];
+                [self log:@"objectReceiver" data:@{@"supportsPlayOnce":@(supported)}];
+                if(supported)[nested playOnce:NO];
+                else self.lastError=[NSError errorWithDomain:@"RhineProbe" code:-1708 userInfo:@{NSLocalizedDescriptionKey:@"当前运行时对象没有公开生成 playOnce: 方法"}];
+            }else [self.music play:nested once:NO];
         }else [self.music play:track once:NO];
     } completion:nil];
 }
