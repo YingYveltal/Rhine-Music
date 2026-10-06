@@ -95,6 +95,17 @@ static NSString *Cloud(NSInteger code) {
 - (void)connect:(id)sender {
     __block NSArray *items;
     [self run:@"连接" work:^{
+        if(!self.music.running){self.lastError=[NSError errorWithDomain:NSOSStatusErrorDomain code:procNotFound userInfo:@{NSLocalizedDescriptionKey:@"Music.app 未运行，请先打开音乐 App，再连接。"}];return;}
+        NSAppleEventDescriptor *target=[NSAppleEventDescriptor descriptorWithBundleIdentifier:@"com.apple.Music"];
+        OSStatus permission=AEDeterminePermissionToAutomateTarget(target.aeDesc,typeWildCard,typeWildCard,false);
+        [self log:@"automationPreflight" data:@{@"status":@(permission)}];
+        if(permission==errAEEventWouldRequireUserConsent){
+            dispatch_async(dispatch_get_main_queue(),^{self.status.stringValue=@"请在系统提示中确认允许探针控制 Music.app。";});
+            permission=AEDeterminePermissionToAutomateTarget(target.aeDesc,typeWildCard,typeWildCard,true);
+            [self log:@"automationRequest" data:@{@"status":@(permission)}];
+        }
+        if(permission!=noErr){self.lastError=[NSError errorWithDomain:NSOSStatusErrorDomain code:permission userInfo:@{NSLocalizedDescriptionKey:@"Music.app 自动化尚未获准；请正常处理系统提示或检查自动化设置。"}];return;}
+        [self log:@"readingVersion" data:@{}];
         NSString *version=self.music.version;if(self.lastError)return;
         items=[[self.music playlists] get];
         if(!self.lastError)[self log:@"library" data:@{@"version":version?:@"",@"playlistCount":@(items.count)}];
@@ -139,7 +150,7 @@ static NSString *Cloud(NSInteger code) {
 - (void)seekTo:(id)sender {double seconds=self.seek.doubleValue;if(!isfinite(seconds)||seconds<0){self.status.stringValue=@"定位秒数必须为非负数";return;}[self run:@"定位" work:^{self.music.playerPosition=seconds;} completion:nil];}
 - (void)refresh:(id)sender {
     if(!self.connected||self.busy)return;
-    if(!self.music.running){self.now.stringValue=@"Music.app 未运行；点击连接可以重新启动并读取。";return;}
+    if(!self.music.running){self.now.stringValue=@"Music.app 未运行；请先打开音乐 App，再连接。";return;}
     __block NSDictionary *state;
     [self run:@"播放状态" work:^{
         NSInteger code=self.music.playerState;double position=self.music.playerPosition;if(self.lastError)return;
