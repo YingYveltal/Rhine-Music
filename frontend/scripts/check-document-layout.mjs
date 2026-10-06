@@ -34,6 +34,7 @@ function fixture(batched) {
 test('batched reads preserve wrapped/scaled overlay geometry while avoiding repeated layout invalidations',()=>{
   const a=fixture(false),b=fixture(true);a.controller.reset(a.root,false);b.controller.reset(b.root,false);
   assert.deepEqual(b.snapshot(),a.snapshot());
+  assert.deepEqual(Array.from(b.controller.layoutGeometry()),Array.from(a.controller.layoutGeometry()));
   assert.equal(b.snapshot().flat().length,48);
   assert.equal(b.flushes,1);assert.ok(a.flushes>=24);
   for(const t of [0,0.35,0.55,0.9]){

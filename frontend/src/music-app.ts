@@ -313,7 +313,11 @@ function measureDocumentLayout(phase: string, work: () => void) {
   if (!measurementActive()) { work(); return; }
   const start = performance.now();
   try { work(); }
-  finally { recordDocumentLayout(performance.now() - start, phase, documentDecryption.batchLayout); }
+  finally {
+    const cpuMs = performance.now() - start;
+    recordDocumentLayout(cpuMs, phase, documentDecryption.batchLayout,
+      import.meta.env.VITE_RENDER_WORK_QA === "1" ? documentDecryption.layoutGeometry() : undefined);
+  }
 }
 const tabTransition = new ContentTransition();
 const detailTransition = new SurfaceTransition(
@@ -1771,7 +1775,7 @@ window.addEventListener("keydown", (event) => {
   if (!event.ctrlKey || !event.altKey || !scene || !ready) return;
   if (import.meta.env.VITE_RENDER_WORK_QA === "1" && event.code === "KeyL") {
     event.preventDefault();
-    if (measurementActive()) return;
+    if (measurementActive() || stressPending) return;
     documentDecryption.batchLayout = !documentDecryption.batchLayout;
     notify(`文字遮罩批量布局：${documentDecryption.batchLayout ? "开启" : "关闭"}`);
     return;

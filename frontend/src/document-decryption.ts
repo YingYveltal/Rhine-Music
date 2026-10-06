@@ -111,6 +111,9 @@ export class DocumentDecryption {
     else if (this.started !== null) this.paint();
   }
 
+  /** Local line boxes only, with no text, for same-layout diagnostic comparison. */
+  layoutGeometry() { return this.covers.map(cover => cover.window.style.cssText); }
+
   private paint() {
     const count = Math.max(1, this.covers.length - 1);
     for (const cover of this.covers) {

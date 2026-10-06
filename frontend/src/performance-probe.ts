@@ -28,7 +28,7 @@ let active:
       label: string;
       scene?: ArchiveScene;
       startingCounters?: ReturnType<ArchiveScene['measurementCounters']>;
-      documentLayouts: { atMs: number; cpuMs: number; phase: string; batched: boolean }[];
+      documentLayouts: { atMs: number; cpuMs: number; phase: string; batched: boolean; geometry?: string[] }[];
       libraryRefreshes: { atMs: number; comparisonCpuMs: number; changed: boolean; albums: number }[];
       start: number;
       until: number;
@@ -90,8 +90,8 @@ export function beginMeasurement(
   return true;
 }
 export function measurementActive() { return active !== undefined; }
-export function recordDocumentLayout(cpuMs: number, phase: string, batched: boolean) {
-  if (active) active.documentLayouts.push({ atMs: performance.now() - active.start, cpuMs, phase, batched });
+export function recordDocumentLayout(cpuMs: number, phase: string, batched: boolean, geometry?: string[]) {
+  if (active) active.documentLayouts.push({ atMs: performance.now() - active.start, cpuMs, phase, batched, geometry });
 }
 export function recordLibraryRefresh(comparisonCpuMs: number, changed: boolean, albums: number) {
   if (active) active.libraryRefreshes.push({ atMs: performance.now() - active.start, comparisonCpuMs, changed, albums });
