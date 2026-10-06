@@ -18,6 +18,7 @@ static NSString *Cloud(NSInteger code) {
 @property NSPopUpButton *lists;
 @property NSTableView *table;
 @property NSMutableArray<NSButton *> *controls;
+@property NSMutableArray *pending;
 @property NSArray *playlists,*tracks,*rows;
 @property RMMusic *music;
 @property NSError *lastError;
@@ -46,7 +47,7 @@ static NSString *Cloud(NSInteger code) {
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     self.queue=dispatch_queue_create("com.rhine.music.appleprobe.events",DISPATCH_QUEUE_SERIAL);
-    self.controls=NSMutableArray.new;self.playlists=@[];self.tracks=@[];self.rows=@[];
+    self.controls=NSMutableArray.new;self.pending=NSMutableArray.new;self.playlists=@[];self.tracks=@[];self.rows=@[];
     self.music=(RMMusic *)[SBApplication applicationWithBundleIdentifier:@"com.apple.Music"];
     self.music.delegate=self;self.music.timeout=60*30;
     NSString *dir=[NSBundle.mainBundle objectForInfoDictionaryKey:@"RhineProbeEvidenceDirectory"];
@@ -60,6 +61,7 @@ static NSString *Cloud(NSInteger code) {
     self.status=[self label:[NSString stringWithFormat:@"Music.app %@ · 尚未连接",self.music.running?@"正在运行":@"未运行"] frame:NSMakeRect(225,598,790,42)];
     self.lists=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(20,551,630,34) pullsDown:NO];self.lists.target=self;self.lists.action=@selector(loadTracks:);self.lists.enabled=NO;[self.window.contentView addSubview:self.lists];
     [self button:@"读取所选歌单" action:@selector(loadTracks:) frame:NSMakeRect(665,551,170,34) control:YES];
+    [self button:@"播放所选歌单" action:@selector(playPlaylist:) frame:NSMakeRect(845,551,175,34) control:YES];
     self.table=[[NSTableView alloc] initWithFrame:NSZeroRect];
     NSArray *names=@[@"顺序",@"曲目",@"歌手",@"来源 / 格式",@"时长"];
     NSArray *widths=@[@50,@300,@180,@310,@80];
@@ -79,7 +81,7 @@ static NSString *Cloud(NSInteger code) {
     [NSTimer scheduledTimerWithTimeInterval:2 target:self selector:@selector(tick:) userInfo:nil repeats:YES];
 }
 - (void)run:(NSString *)name work:(void (^)(void))work completion:(void (^)(BOOL))completion {
-    if(self.busy)return;self.busy=YES;self.status.stringValue=[name stringByAppendingString:@"…"];
+    if(self.busy){__weak Probe *owner=self;[self.pending addObject:[^{[owner run:name work:work completion:completion];} copy]];return;}self.busy=YES;self.status.stringValue=[name stringByAppendingString:@"…"];
     dispatch_async(self.queue,^{
         self.lastError=nil;
         @try{work();}@catch(NSException *e){self.lastError=[NSError errorWithDomain:@"RhineProbe" code:-1 userInfo:@{NSLocalizedDescriptionKey:e.reason?:@"接口异常"}];}
@@ -89,6 +91,7 @@ static NSString *Cloud(NSInteger code) {
             self.busy=NO;
             self.status.stringValue=error?[NSString stringWithFormat:@"%@失败（%ld）：%@",name,error.code,error.localizedDescription]:[name stringByAppendingString:@"完成"];
             if(completion)completion(!error);
+            if(!self.busy && self.pending.count){void (^next)(void)=self.pending.firstObject;[self.pending removeObjectAtIndex:0];next();}
         });
     });
 }
@@ -124,7 +127,7 @@ static NSString *Cloud(NSInteger code) {
     }];
 }
 - (void)loadTracks:(id)sender {
-    NSInteger index=self.lists.indexOfSelectedItem;if(index<0||(NSUInteger)index>=self.playlists.count||self.busy)return;
+    NSInteger index=self.lists.indexOfSelectedItem;if(index<0||(NSUInteger)index>=self.playlists.count)return;
     RMPlaylist *list=self.playlists[index];__block NSArray *tracks,*rows;__block NSUInteger total=0;
     [self run:@"读取曲目" work:^{
         SBElementArray *elements=list.tracks;total=elements.count;if(self.lastError)return;
@@ -141,6 +144,7 @@ static NSString *Cloud(NSInteger code) {
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)column row:(NSInteger)row {
     NSDictionary *item=self.rows[row];return item[@[@"order",@"name",@"artist",@"source",@"duration"][column.identifier.integerValue]];
 }
+- (void)playPlaylist:(id)sender {NSInteger i=self.lists.indexOfSelectedItem;if(i<0||(NSUInteger)i>=self.playlists.count)return;RMPlaylist *playlist=self.playlists[i];[self run:@"播放歌单队列" work:^{[self.music play:playlist once:NO];} completion:nil];}
 - (void)playSelected:(id)sender {NSInteger row=self.table.selectedRow;if(row<0||(NSUInteger)row>=self.tracks.count)return;RMTrack *track=self.tracks[row];[self run:@"播放所选" work:^{[self.music play:track once:NO];} completion:nil];}
 - (void)pause:(id)sender {[self run:@"暂停" work:^{[self.music pause];} completion:nil];}
 - (void)resume:(id)sender {[self run:@"继续播放" work:^{[self.music play:nil once:NO];} completion:nil];}
