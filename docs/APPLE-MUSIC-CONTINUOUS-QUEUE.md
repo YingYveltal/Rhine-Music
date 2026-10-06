@@ -55,3 +55,11 @@
 剩余产品路线需由总控与用户选择：继续寻找有明确公开依据的新上下文入口；或改变“无需开发者会员”的前提并单独核实 MusicKit 所需能力与成本；或接受整张歌单/单曲的能力边界后再做 Rhine 集成。本轮不购买、不申请新账户、不写用户资料库，也不把实验分支合并为完成品。
 
 接口依据是本机 Music.sdef 与 SDK 的 SBObject、NSAppleEventDescriptor、Apple Event 对象 specifier、ASRegistry 声明。Apple 的 [Scripting Bridge 使用指南](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ScriptingBridgeConcepts/UsingScriptingBridge/UsingScriptingBridge.html)说明对象接收器和空引用风险；[性能指南](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ScriptingBridgeConcepts/ImproveScriptingBridgePerf/ImproveScriptingBridgePerf.html)说明引用与 get。旧示例只作候选来源，结果以本机运行证据为准。
+
+## 补充：Music.app 原生界面入口对照
+
+在总控追加安排下，同一 `3125cf4` 可执行文件未重建，补做正常 GUI 对照：先将 Music 窗口置前，通过歌单 `trackTable` 内第 10 首的曲名、艺人/专辑定位并双击，系统立即建立后续第 11、12、13、14 首的正确队列。无需逐首 next、临时写歌单或修改偏好。Music 自身工具栏暂停后，探针在 63.688 秒持续保持暂停约 14 秒；仅通过探针定位 301 秒并恢复，系统在现有 AutoMix 开启时自动进入相邻第 11 首，随后观察到其进度超过 23 秒。Music「控制 → 停止」（AX `kStopCommand`）后，探针保持 `kPSS` 超过 30 秒，没有回弹，最后退出探针。
+
+UI 中行、曲目信息和停止动作有可读取的 AX 表达；初次双击是在 Music 前台完成。后续探针在前台时 Music 队列继续工作。没有测试 Music 在后台直接启动选曲，因此不能推断“必须前台”或“支持静默后台点歌”。没有开发产品 AX 自动化。
+
+这个对照证明 GUI 入口的行为不同，**不满足 #28 的非人工建队列门槛，也不是产品验收**。完整日志追加至 641 行；原 501 行快照保持不变，GUI 阶段从行 502 开始，另存本机 `.local/apple-probe/evidence/gui-entry-3125cf4/`。行 531–545 为暂停保持，547/560 为定位和恢复，567 为相邻曲目，608–640 为外部停止保持。来源：[Apple 官方队列指南](https://support.apple.com/en-mt/guide/music/musb1e6d1c76/mac)。
