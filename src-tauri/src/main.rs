@@ -1,6 +1,8 @@
 #[cfg(feature = "preview")]
 mod preview;
 mod audio;
+mod apple;
+mod player;
 mod library;
 mod online;
 mod qq;
@@ -24,7 +26,8 @@ struct Jobs {
 struct Core {
     library: Mutex<Library>,
     jobs: Mutex<Jobs>,
-    audio: audio::Audio,
+    audio: player::Player,
+    apple: Arc<apple::Apple>,
     qq:Arc<qq::Qq>,
 }
 fn snapshot(core: &Core, app: &tauri::AppHandle) -> Result<Value> {
@@ -82,8 +85,18 @@ fn snapshot(core: &Core, app: &tauri::AppHandle) -> Result<Value> {
         if let Some(ts)=value["tracks"].as_array_mut(){for t in ts{if let Some(o)=t.as_object_mut(){for k in ["_path","_common","_embeddedCover","_fingerprint"]{o.remove(k);}}}}
         albums.as_array_mut().unwrap().push(value);
     }
+    for mut album in core.apple.albums() {
+        if let Some(path)=album["nativeCoverPath"].as_str().map(PathBuf::from) {
+            if let Ok(path)=path.canonicalize() {
+                if path.starts_with(core.apple.cover_root().canonicalize()?) { app.asset_protocol_scope().allow_file(&path)?; }
+                else { album.as_object_mut().unwrap().remove("nativeCoverPath"); }
+            }
+        }
+        albums.as_array_mut().unwrap().push(album);
+    }
+    genres.push(library::Genre{id:"apple-playlists".into(),name:"Apple Music 歌单".into(),aliases:vec![]});
     Ok(
-        json!({"version":1,"albums":albums,"genres":genres,"qq":core.qq.status(),"roots":lib.config.roots.iter().map(|path|lib.index.roots.iter().find(|r|&r.path==path).map(|r|serde_json::to_value(r).unwrap()).unwrap_or(json!({"path":path,"status":"unscanned"}))).collect::<Vec<_>>(),"scan":if jobs.scan.is_null(){json!({"running":false})}else{jobs.scan.clone()},"enrich":if jobs.enrich.is_null(){json!({"running":false,"completed":0,"total":0})}else{jobs.enrich.clone()},"introductions":if jobs.introductions.is_null(){json!({"running":false,"completed":0,"total":0,"updated":0,"notFound":0,"failed":0})}else{jobs.introductions.clone()},"onlineEnabled":lib.config.online_enabled}),
+        json!({"version":1,"albums":albums,"genres":genres,"qq":core.qq.status(),"apple":core.apple.status(),"roots":lib.config.roots.iter().map(|path|lib.index.roots.iter().find(|r|&r.path==path).map(|r|serde_json::to_value(r).unwrap()).unwrap_or(json!({"path":path,"status":"unscanned"}))).collect::<Vec<_>>(),"scan":if jobs.scan.is_null(){json!({"running":false})}else{jobs.scan.clone()},"enrich":if jobs.enrich.is_null(){json!({"running":false,"completed":0,"total":0})}else{jobs.enrich.clone()},"introductions":if jobs.introductions.is_null(){json!({"running":false,"completed":0,"total":0,"updated":0,"notFound":0,"failed":0})}else{jobs.introductions.clone()},"onlineEnabled":lib.config.online_enabled}),
     )
 }
 fn any_job(j: &Jobs) -> bool {
@@ -358,12 +371,22 @@ fn toggle_fullscreen(window: tauri::WebviewWindow) -> std::result::Result<(), St
 }
 #[tauri::command]
 async fn qq_request(core:State<'_,Arc<Core>>,operation:String,body:Option<Value>)->std::result::Result<Value,String>{
-    if operation=="logout" {let _ = core.audio.stop();}
+    if operation=="logout" {let _ = core.audio.send(player::Command::Stop);}
     let qq=core.qq.clone();
     tauri::async_runtime::spawn_blocking(move||qq.request(&operation,body.unwrap_or(json!({}))).map_err(|e|e.to_string())).await.map_err(|_|"QQ 后台任务未完成".to_owned())?
 }
 #[tauri::command]
-fn player_state(core: State<'_, Arc<Core>>) -> audio::Playback {
+async fn apple_request(core:State<'_,Arc<Core>>,operation:String,body:Option<Value>)->std::result::Result<Value,String>{
+    let body=body.unwrap_or(json!({}));
+    if operation=="enable" && body["enabled"]==false {
+        core.audio.send(player::Command::DisableApple).map_err(|e|e.to_string())?;
+    }
+    let apple=core.apple.clone();
+    tauri::async_runtime::spawn_blocking(move||apple.request(&operation,body).map_err(|e|e.to_string()))
+        .await.map_err(|_|"Apple Music 后台任务未完成".to_owned())?
+}
+#[tauri::command]
+fn player_state(core: State<'_, Arc<Core>>) -> Value {
     core.audio.snapshot()
 }
 #[tauri::command]
@@ -379,6 +402,11 @@ fn player_command(
             "play" => {
                 let id = id.context("缺少曲目 ID")?;
                 let ids = ids.unwrap_or_else(|| vec![id.clone()]);
+                if id.starts_with("apple-track-") {
+                    core.apple.playable()?;
+                    anyhow::ensure!(ids.iter().all(|id|id.starts_with("apple-track-")),"首版不支持跨来源混合队列");
+                    return core.audio.send(player::Command::ApplePlay{id,ids});
+                }
                 let lib = core.library.lock().unwrap();
                 let mut tracks = Vec::new();
                 for id in ids {
@@ -401,26 +429,30 @@ fn player_command(
                     .iter()
                     .position(|t| t.id == id)
                     .context("歌曲不在队列中")?;
-                core.audio.play(tracks, index)
+                core.audio.send(player::Command::Play(tracks, index))
             }
-            "toggle" => core.audio.toggle(),
-            "stop" => core.audio.stop(),
-            "unlock" => core.audio.unlock(),
-            "seek" => core
-                .audio
-                .seek(value.and_then(|v| v.as_f64()).context("位置必须为数字")?),
+            "toggle" => core.audio.send(player::Command::Toggle),
+            "stop" => core.audio.send(player::Command::Stop),
+            "unlock" => core.audio.send(player::Command::Unlock),
+            "next" => core.audio.send(player::Command::Next),
+            "previous" => core.audio.send(player::Command::Previous),
+            "seek" => {
+                let seconds=value.and_then(|v| v.as_f64()).context("位置必须为数字")?;
+                anyhow::ensure!(seconds.is_finite() && seconds>=0.,"位置必须为非负有限数字");
+                core.audio.send(player::Command::Seek(seconds))
+            },
             "settings" => {
                 let v = value.context("缺少设置")?;
                 let volume = |key: &str, default: f64| {
                     v[key].as_f64().unwrap_or(default).clamp(0., 1.) as f32
                 };
-                core.audio.settings(
+                core.audio.send(player::Command::Settings(
                     volume("volume", 0.65),
                     volume("bgmVolume", 0.18),
                     0.,
                     v["bgmEnabled"].as_bool().unwrap_or(true),
                     v["songFadeEnabled"].as_bool().unwrap_or(true),
-                )
+                ))
             }
             _ => bail!("不支持的播放操作"),
         }
@@ -551,12 +583,14 @@ fn main() {
                 .unwrap_or(app.path().app_data_dir()?);
             let lib = Library::open(data)?;
             let qq=qq::Qq::new(&lib.dir)?;
+            let apple=apple::Apple::new(&lib.dir)?;
             let resolver_qq=qq.clone();
             let scan = !lib.config.roots.is_empty();
             let core = Arc::new(Core {
                 library: Mutex::new(lib),
                 jobs: Mutex::new(Jobs::default()),
-                audio: audio::Audio::with_resolver(assets(app),Some(Arc::new(move|track,token,expected|resolver_qq.prepare(track,token,expected)))),
+                audio: player::Player::new(Arc::new(audio::Audio::with_resolver(assets(app),Some(Arc::new(move|track,token,expected|resolver_qq.prepare(track,token,expected))))),apple.native.clone()),
+                apple,
                 qq:qq.clone(),
             });
             app.manage(core.clone());
@@ -576,6 +610,7 @@ fn main() {
             player_command,
             player_state,
             qq_request,
+            apple_request,
             save_benchmark,
             save_render_capture,
             open_link,

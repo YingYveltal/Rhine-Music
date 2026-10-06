@@ -25,6 +25,8 @@ pub struct Playback {
     pub bgm_error: Option<String>,
     pub applied_command: u64,
     pub worker_error: Option<String>,
+    pub current_index: usize,
+    pub queue_generation: u64,
 }
 enum Command {
     Play(Vec<Track>, usize),
@@ -33,6 +35,7 @@ enum Command {
     Seek(f64),
     Unlock,
     Volume(f32, f32, f32, bool, bool),
+    External(bool),
     Quit,
 }
 struct QueuedCommand {
@@ -86,6 +89,9 @@ impl Audio {
     pub fn snapshot(&self) -> Playback {
         self.state.lock().unwrap().clone()
     }
+    // A source-switch barrier: invalidate preparation, drain the song and pause
+    // BGM without changing the user's saved BGM preference.
+    pub fn external(&self, active: bool) -> anyhow::Result<u64> { self.send(Command::External(active)) }
 }
 impl Drop for Audio {
     fn drop(&mut self) {
@@ -160,6 +166,8 @@ fn run_transport(
     let mut bgm_transition = Instant::now();
     let mut bgm_from = 0.;
     let mut bgm_target = 0.;
+    let mut external = false;
+    let mut drain_receipt = None;
     state.lock().unwrap().transport = "idle".into();
     loop {
         let mut applied = None;
@@ -173,6 +181,7 @@ fn run_transport(
                         unlocked = true;
                         queue = tracks;
                         index = i;
+                        state.lock().unwrap().queue_generation += 1;
                         let same = loaded_track.as_ref().is_some_and(|track| track.id == queue[i].id);
                         if same && !sink.empty() {
                             sink.play();
@@ -256,6 +265,19 @@ fn run_transport(
                     bgm_volume = b;
                     bgm_enabled = on;
                     fade = f;
+                }
+                Command::External(active) => {
+                    external = active;
+                    if active {
+                        epoch.fetch_add(1, Ordering::SeqCst); loading = None;
+                        sink.set_volume(0.); sink.play(); sink.stop();
+                        loaded_track = None; pending = None; queue.clear(); phase = 0; stopped = true;
+                        bgm_gain = 0.; bgm_from = 0.; bgm_target = 0.;
+                        if let Some(bgm) = &bgm { bgm.set_volume(0.); bgm.pause(); }
+                        drain_receipt = applied.take();
+                        let mut s = state.lock().unwrap();
+                        s.playing = false; s.elapsed = 0.; s.transport = "idle".into(); s.error = None;
+                    } else if let Some(bgm) = &bgm { bgm.play(); }
                 }
             }
         }
@@ -343,7 +365,7 @@ fn run_transport(
                 state.lock().unwrap().transport = "idle".into();
             }
         }
-        let target = if stopped && bgm_enabled && unlocked {
+        let target = if !external && stopped && bgm_enabled && unlocked {
             1.0
         } else {
             0.0
@@ -367,6 +389,13 @@ fn run_transport(
             sink.get_pos().as_secs_f64()
         };
         s.bgm_playing = bgm_gain > 0.001 && bgm.is_some();
+        s.current_index = index;
+        if let Some(waiting) = drain_receipt.as_mut() {
+            if let Some(newer) = applied.take() { *waiting = (*waiting).max(newer); }
+        }
+        if drain_receipt.is_some() && sink.empty() && bgm.as_ref().is_none_or(|b| b.is_paused()) {
+            applied = drain_receipt.take();
+        }
         // Publish the acknowledgment only with this iteration's final snapshot.
         if let Some(sequence) = applied { s.applied_command = sequence; }
     }
