@@ -1,0 +1,4 @@
+#apple-connection { margin-top: 0; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line, #aaa5); }
+#apple-status { white-space: pre-line; font-variant-numeric: tabular-nums; }
+#apple-connection button:disabled { opacity: .45; cursor: default; }
+#apple-feedback:empty, #playback-capability-note:empty { display: none; }

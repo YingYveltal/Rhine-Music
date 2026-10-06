@@ -1,6 +1,9 @@
 import type { MusicTrack } from "./music-types";
 
 export interface MusicPlayerState {
+  source?: 'local' | 'qq' | 'apple' | null;
+  queueGeneration?: number;
+  capabilities?: { seek: boolean; volume: boolean; fade: boolean };
   transport: "idle" | "loading" | "playing" | "paused" | "error";
   currentTrack: MusicTrack | null;
   queue: readonly MusicTrack[];

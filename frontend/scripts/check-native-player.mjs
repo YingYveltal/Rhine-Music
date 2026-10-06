@@ -225,3 +225,78 @@ test('current poll failures surface and recover, while disposed calls remain sil
   assert.deepEqual(player.state, before);
   assert.equal(emitted, count);
 });
+
+const appleTracks = tracks.map(t => ({ ...t, source: 'apple', albumId: 'apple-list', title: 'Repeated song', browserPlayable: false }));
+const appleSnapshot = (index, receipt, extra = {}) => snapshot(index, receipt, {
+  track: appleTracks[index], source: 'apple', currentIndex: index, queueGeneration: 7,
+  capabilities: { seek: true, volume: false, fade: false }, ...extra,
+});
+async function beginApple(env, index = 1) {
+  const play = env.player.play(appleTracks[index].id, appleTracks); await settle();
+  const command = env.commands.at(-1);
+  assert.equal(command.operation, 'play');
+  assert.deepEqual(command.ids, ['A', 'B', 'C'], 'preserve opaque occurrence IDs even when song titles repeat');
+  command.resolve(2); await play;
+  await env.poll(appleSnapshot(index, 2));
+}
+
+test('Apple resumes its paused queue with toggle and observes automatic continuation by occurrence ID', async t => {
+  const env = await fixture(t), { player, commands } = env;
+  await beginApple(env);
+  const pause = player.toggle(); await settle();
+  assert.equal(commands.at(-1).operation, 'toggle'); commands.at(-1).resolve(3); await pause;
+  await env.poll(appleSnapshot(1, 3, { transport: 'paused', playing: false, elapsed: 44 }));
+  const resume = player.toggle(); await settle();
+  assert.equal(commands.at(-1).operation, 'toggle', 'do not rebuild the Apple queue with play');
+  assert.equal(player.state.currentTime, 44);
+  commands.at(-1).resolve(4); await resume;
+  await env.poll(appleSnapshot(1, 3, { transport: 'paused', playing: false, elapsed: 44 }));
+  assert.equal(player.state.transport, 'loading', 'old receipt cannot undo resume');
+  await env.poll(appleSnapshot(1, 4, { elapsed: 45 }));
+  await env.poll(appleSnapshot(2, 4, { elapsed: 1 }));
+  assert.equal(player.state.currentTrack.id, 'C'); assert.equal(player.state.currentIndex, 2);
+  assert.equal(player.state.queue.length, 3);
+  assert.equal(commands.filter(c => c.operation === 'play').length, 1);
+  await env.poll(appleSnapshot(1, 4, { queueGeneration: 6 }));
+  assert.equal(player.state.currentTrack.id, 'C', 'same-source stale queue must not replace the current queue');
+});
+
+test('Apple skips natively; previous seeks after three seconds, and Stop wins over late skip snapshots', async t => {
+  const env = await fixture(t), { player, commands } = env;
+  await beginApple(env);
+  await player.previous(); await settle();
+  assert.equal(commands.at(-1).operation, 'seek'); assert.equal(commands.at(-1).value, 0);
+  commands.at(-1).resolve(3); await settle();
+  await env.poll(appleSnapshot(1, 3, { elapsed: 0 }));
+  const previous = player.previous(); await settle();
+  assert.equal(commands.at(-1).operation, 'previous'); commands.at(-1).resolve(4); await previous;
+  await env.poll(appleSnapshot(0, 4, { elapsed: 0 }));
+  const next = player.next(); await settle(); assert.equal(commands.at(-1).operation, 'next');
+  player.stop();
+  commands.at(-1).resolve(5); await next; await settle();
+  assert.equal(commands.at(-1).operation, 'stop');
+  await env.poll(appleSnapshot(1, 5)); assert.equal(player.state.transport, 'idle');
+  commands.at(-1).resolve(6); await settle();
+  await env.poll(appleSnapshot(1, 6, { source: null, queueGeneration: 0, playing: false, transport: 'idle', elapsed: 0 }));
+  assert.equal(player.state.transport, 'idle');
+  await env.poll(appleSnapshot(1, 5)); assert.equal(player.state.transport, 'idle');
+});
+
+test('source changes use receipts, not a globally monotonic queue generation; local settings survive Apple', async t => {
+  const env = await fixture(t), { player, commands } = env;
+  await beginApple(env);
+  const before = commands.length;
+  player.setVolume(.2); player.setSongFadeEnabled(false); await settle();
+  assert.equal(commands.length, before, 'unsupported Apple controls issue no settings commands');
+  assert.equal(player.state.volume, .65); assert.equal(player.state.songFadeEnabled, true);
+  const play = player.play('A', tracks); await settle();
+  assert.equal(commands.at(-1).operation, 'play'); commands.at(-1).resolve(3); await play;
+  await env.poll(appleSnapshot(1, 2)); assert.equal(player.state.currentTrack.id, 'A');
+  await env.poll(snapshot(0, 3, { source: 'local', queueGeneration: 0, currentIndex: 0, capabilities: { seek: true, volume: true, fade: true } }));
+  assert.equal(player.state.source, 'local'); assert.equal(player.state.transport, 'playing');
+  assert.equal(player.state.capabilities.volume, true);
+  player.setVolume(.4); await settle();
+  assert.equal(commands.at(-1).operation, 'settings'); assert.equal(commands.at(-1).value.volume, .4);
+  assert.equal(commands.at(-1).value.songFadeEnabled, true);
+  commands.at(-1).resolve(4); await settle();
+});
