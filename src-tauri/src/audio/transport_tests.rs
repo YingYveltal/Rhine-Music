@@ -63,6 +63,24 @@ fn consume(output: &mut Output, samples: usize) {
 }
 
 #[test]
+fn external_source_barrier_waits_for_drain_and_later_settings_cannot_skip_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let track = wav(dir.path(), "local", 80000);
+    let player = Transport::new(None);
+    player.play(&[track], 0); player.playing("local");
+    let mut output = player.output(); consume(&mut output, 1000);
+    let barrier = player.audio.external(true).unwrap();
+    let settings = player.audio.settings(0.5,0.2,0.,true,true).unwrap();
+    player.wait(|s|s.transport=="idle");
+    std::thread::sleep(Duration::from_millis(30));
+    assert!(player.audio.snapshot().applied_command < barrier, "stop intent is not a drain acknowledgment");
+    consume(&mut output,1000);
+    let settled=player.wait(|s|s.applied_command>=settings);
+    assert!(!settled.playing && !settled.bgm_playing);
+    assert_eq!(settled.transport,"idle");
+}
+
+#[test]
 fn returning_during_fade_restores_the_loaded_qq_metadata_and_position() {
     let dir = tempfile::tempdir().unwrap();
     let mut resolved = wav(dir.path(), "qq-a", 80000);

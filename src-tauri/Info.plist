@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSAppleMusicUsageDescription</key>
+<string>Rhine 读取你已有的音乐歌单，并在你点播时通过 Apple Music 播放。</string>
+</dict></plist>
