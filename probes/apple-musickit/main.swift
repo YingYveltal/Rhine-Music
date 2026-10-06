@@ -227,7 +227,13 @@ import MusicKit
     // A late SDK completion can still have transient effects; logs/tests bound that risk.
     func settle(_ ticket: Int) {
         if ticket != generation { log("staleCommandCompletion", ["ticket": ticket, "latest": generation, "intent": intent]) }
-        enforceIntent()
+        guard let p = player else { return }
+        // SDK status may still say paused when play() completes, before a late
+        // transition to playing. Always send the latest terminal intent here.
+        if intent == "stopped" || intent == "paused" {
+            log("completionIntent", ["ticket": ticket, "latest": generation, "intent": intent, "nativeStateBefore": String(describing: p.state.playbackStatus)])
+            if intent == "stopped" { p.stop() } else { p.pause() }
+        }
     }
     func enforceIntent() {
         guard let p = player else { return }

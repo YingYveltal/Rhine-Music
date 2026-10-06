@@ -2,7 +2,7 @@
 
 **原生 MusicKit 已在当前 ad-hoc 探针中完成有限曲库读取、个人本地 AAC 播放和云订阅歌曲从样本队列中段开始后的自动续播。** 无需本轮新增开发者会员、Team ID、App Service 配置或自供 token。这纠正了“任何原生 MusicKit 操作都先需要开发者会员”的过强推断，但不是所有部署方式的承诺，也不是 Rhine 已接通。
 
-这次队列来自 `MusicLibraryRequest<Song>` 的最多 3 条样本，**尚不是用户指定歌单的真实顺序**。下一门槛是已有 Playlist 的原生关系读取、顺序和中段起播；不能将当前样本成功等同于歌单功能完成。
+**后续 f090853 已通过真实25首歌单的顺序读取、中段选曲及自动续播，详见末尾追加结果。** 下述 d5b3c55 是初始三条 Song 样本阶段，保留其原始范围和证据。两阶段均为原型，Rhine 尚未集成。
 
 ## 版本和运行条件
 
@@ -45,8 +45,59 @@ Music.app 在这些原生播放期间保持未播放；QQ Preview 也停止。`A
 
 未覆盖：用户指定 Playlist 及其真实顺序、重复歌曲、已下载的订阅内容、完整不定位曲尾、主观实际出声、拒绝/撤销授权、目录搜索/REST/自动 token、重启恢复、其他 OS/账户、正式签名分发、快速指令竞态、系统媒体键、Rhine UI 和自动跨来源互斥。只读已下载请求返回的两条样本均为个人 AAC，本轮没有下载订阅歌曲来补测试。
 
-## 路线结论
+## 初始样本阶段的路线结论
 
 可以继续验证 `ApplicationMusicPlayer`，无需先购买会员作为本机试验前置条件。先完成真实 Playlist 样本与独立复核，再决定桥接 Rhine。Apple Music API 的目录/REST 身份条件、正式签名及分发条件仍分别核实，不能从本次成功推广为全平台免费无门槛。
 
 Apple [MusicLibraryRequest](https://developer.apple.com/documentation/musickit/musiclibraryrequest)和 [ApplicationMusicPlayer](https://developer.apple.com/documentation/musickit/applicationmusicplayer)提供这条原生能力；[DTS 说明](https://developer.apple.com/forums/thread/784114)区分 App Service 和 entitlement，但本轮可行结论来自真实运行，不仅来自这条说明。此前 Apple Events 失败和 GUI 正向对照仍见 [队列对照报告](APPLE-MUSIC-CONTINUOUS-QUEUE.md)，并不与此处独立播放器成功矛盾。
+
+## 真实 Playlist：f090853
+
+干净源码 `f0908533ce6c538e17492f169c83d8479222f7cc`，可执行 SHA-256 `ecf3a69fc29ec452129881384bc62646d81d2fb1731e5094e36c8a1c27c1e409`，Info.plist SHA 与初始包相同。编译无警告、严格签名检查通过，OS/SDK/签名及身份沿用上述条件。后续文档提交不改变已测二进制。
+
+正常授权返回 authorized；最多10个歌单请求返回2个，选定一个已有25首歌单，分别读取原生 `.entries` 和 `.tracks` 关系（preferredSource `.library`）。两者均一页完整返回、无剩余页，数量/标题/艺人逐项一致，entries.position 为0–24。未排序、搜索替代或去重。CUA 检查 Music.app 的“播放列表顺序 / 升序”勾选，并核对原始相邻第9–12行。运行时完整25条标题序列与输入对齐；这不是任意重复条目身份映射已解决的证据。
+
+| 验证 | 实际观察 |
+| --- | --- |
+| 真实中段 | `Queue(for: [Track], startingAt:)` 从第10首开始，实际进度增长超过22秒；暂停定位301/311.406秒、恢复，自动进入第11首并继续超过19秒；未手工 Next |
+| 近开头 | 同一歌单从第2首开始，进度超过19秒；暂停定位326/336秒、恢复，自动进入第3首并继续超过24秒；未手工 Next |
+| 前后切与暂停 | 快速 Next→Pause 后第4首 paused / 0.128秒保持；暂停中 Previous 返回第3首 paused / 0秒；Next→Stop 后第4首 paused / 0.126秒保持。两次 Next 实际均先完成，不能宣称验证了在途 Next 的晚完成 |
+| 真正在途 Play→Stop | queueGeneration3 的 Play ticket16 在 Stop ticket17 后完成，18:00:53 UTC 记录 staleCommandCompletion；18:00:54 仍需 reassertStop。之后原生 paused / 0.747143345秒稳定超过4分钟；停止后直接 Resume 不重启旧队列。存在晚起播再收敛，不能写成零回弹或队列已清空 |
+| 同二进制 Song 对照 | `Queue(for: [Song], startingAt:)` 从三条库样本的第2首起播，定位209秒后自动进入第3首，观察进度超过9.9秒。最终 Stop 在队列结束后发生，原生停留首条 paused / 0秒；不作为末条停止保持的证据 |
+
+只读随机/重复状态为 off/none，没有修改系统偏好。ID 解析可能由库 ID 转为目录 ID，不能用别名变化推断换曲。来源与运行条目仅在整个数量与标题序列匹配后附同序号映射；跨代次 entryID 可复用。重复标题/重复歌曲出现位置尚未专项验证。
+
+### 失败候选
+
+`5e48d4a` 的 `Queue.Entry` 包装序列构造，及 `8e1301a` 的 `Queue(playlist:startingAt:)` 均在本机返回 `MPMusicPlayerControllerErrorDomain / 6`。这不等于 MusicKit 所有路径失败，更没有证据可称为 token、会员或 App Service 拒绝。后者失败后 SDK 延迟暴露 paused 队列，反复赋空队列仍保留条目；f090853 删除该无效循环，改为停止意图锁定并保留 SDK 队列。源码/包与日志分别保留在 ignored `preserved-5e48d4a`、`preserved-8e1301a` 及对应 `evidence/run-*`。
+
+### 本轮证据和边界
+
+不可变本机目录 `.local/musickit-probe/evidence/run-f090853/` 保存本次独立日志1088行，来自累计日志735–1822行，最后为 quit；report 写明观察、范围和遗漏。个人元数据不提交仓库。
+
+| 文件 | SHA-256 |
+| --- | --- |
+| events.jsonl | `afbcc356b129115346f2c13eaffb080d4e97f496f3f6f555d41ad2e787b0db5b` |
+| report.json | `6b78ddbeaf12bf4d7604bc3d61a9e2ec60980c7bb4ea206925e3cefe1ff8260f` |
+| manifest.json | `759211c0c6adfe34b2f2638b0d1a07479d1a53827dd28cbd0b16083cd5a130f7` |
+
+原始 `playerBeforeIntent` 记录补偿之前的 SDK 状态，但1秒采样无法排除更短瞬态。探针持续重申 pause/stop 意图会压制媒体键 Resume，**不能照搬成产品暂停循环**。UI 各字段顺序读取，准备期并非原子快照。代理未操作系统权限按钮，不能据此断言无瞬时提示。
+
+f090853 已交同包独立复核。已发现停止收敛需小修：异步操作完成后应无条件补发最新 Stop/Pause，不能因当时 SDK 状态仍为 paused 而跳过，让随后晚起播留给轮询补偿。此项定向修复及复测另记版本，不改写 f090853 结果。
+
+尚未覆盖：重复出现条目的通用定位、完整不定位曲尾、主观实际出声、已下载订阅内容、拒绝/撤销授权、系统媒体键、跨来源自动互斥、重启与分发身份、其他OS/账户。当前成功属于本机有界原型，不是 Rhine 功能验收。
+
+## 推荐 Rhine 首版接入契约（提案，未实现）
+
+保留现有 Rust/Tauri 命令入口与 QQ/本地功能，通过小型 Swift MusicKit 模块的异步 C ABI 桥接到 Rust；MusicKit 在 MainActor 管理真实 Song/Track 对象，不阻塞主线程等待异步回调。前端只访问 Tauri。
+
+| 接口 | 推荐约定 |
+| --- | --- |
+| `apple_request` | `status / authorize / sync / enable({enabled})`；status 至少返回 supported、authorization、enabled、playlistCount、trackCount、updatedAt、job{running,completed,total,message,error}。拒绝/不可用有明确状态，不以目录或订阅预检阻断读库 |
+| `/api/library` | 追加 Apple 状态及 source=`apple` 歌单卡片；同步个人歌单快照，保留顺序、重复项、不可播项、分页完成/部分失败信息。首版不含目录搜索 |
+| 曲目身份 | UI id 为歌单快照内不透明的出现条目ID，连同源 position 与 snapshot revision 定位；不能用解析 songID 去重。Swift 保留原生 Track，运行队列映射绑定 queueGeneration；遇重复项不能唯一定位时显式报错，不默选第一个 |
+| `player_command / player_state` | 保留 receipt 与 appliedCommand 屏障，只有原生结果确认后才推进；增加 source、currentIndex、queueGeneration 和 seek/volume/fade 能力字段。Apple 前后切走原生 skip；暂停后 toggle 真正 resume，不能沿用前端 paused→play(id) 的重建行为；自动换曲以原生状态为准 |
+| 来源互斥 | Rust 单一命令序列先使旧准备任务过期，等待旧播放器真实停止且在途异步播放完成/被抑制，再启动新来源。QQ resolver、Rust 音频/BGM 和 Apple 都纳入切换；只设置UI stopped或取消Task不足以保证不串音。原型事后重申停止不能据此承诺零重叠 |
+| 系统控制 | 独立 ApplicationMusicPlayer，不假设 Music.app 能控制它。暂停/停止应是明确命令及有限在途收敛；正常媒体键恢复需要更新权威状态，不用永久暂停循环压回去。SDK stop 保留队列/位置，产品显示和恢复语义须一致 |
+
+Apple 功能运行门槛 macOS14+；保留低系统的 QQ/本地能力，在最终 Rhine 包以正常用途说明及真实身份重新验授权。音量、淡入淡出等未验证能力显式不可用，不能改全局系统设置代替实现。原生/构建/数据由音乐来源任务负责，前端由视觉任务负责，各独立 Issue 与 worktree，由总控串行整合。

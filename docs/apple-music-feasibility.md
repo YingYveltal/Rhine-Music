@@ -6,7 +6,9 @@
 
 `d5b3c55` 独立原生探针在本机 ad-hoc / 无 Team、App Service 或自供 token 的条件下，正常 MusicAuthorization 返回 authorized；MusicLibraryRequest 的已下载和现有库有限查询均成功。ApplicationMusicPlayer 已播放两条个人本地 AAC，并从三条库样本的中间云订阅歌曲起播、定位尾段后自动接到后一条云订阅歌曲。详细源码/包哈希、原始本地证据和限制见 [原生验证报告](APPLE-MUSICKIT-NATIVE-PROBE.md)。
 
-这排除了把“付费开发者会员”视作本次原生读库/播放试验必需前提的做法。它**不证明** Apple Music 目录搜索、REST API、自动 token 配置、正式分发或其他机器/账户均无身份要求。已下载订阅音乐、真实 Playlist 顺序、媒体键、重启、主观出声和 Rhine 集成仍未验证。播放器独立于 Music.app；外部暂停/停止语义不能沿用共享遥控路线。本次 SDK 的 stop 后状态为 paused 并保留位置，需由产品定义停止行为。
+后续 `f090853` 已读取真实25首 Playlist 的 entries/tracks 并核对顺序，验证第10→11及第2→3自动续播，同包 Song 对照通过；快速 Play→Stop 暴露短暂晚起播后收敛，尚待定向修复。详细版本及证据仍以原生报告为准。
+
+这排除了把“付费开发者会员”视作本次原生读库/播放试验必需前提的做法。它**不证明** Apple Music 目录搜索、REST API、自动 token 配置、正式分发或其他机器/账户均无身份要求。已下载订阅音乐、重复条目通用定位、媒体键、重启、主观出声和 Rhine 集成仍未验证。播放器独立于 Music.app；外部暂停/停止语义不能沿用共享遥控路线。本次 SDK 的 stop 后状态为 paused 并保留位置，需由产品定义停止行为。
 
 ## 给产品经理的结论
 
@@ -32,7 +34,7 @@
 
 | 路线 | 用户体验与必要条件 | 判断 |
 | --- | --- | --- |
-| **原生 MusicKit + Swift 桥接** | Rhine 自己管理 Apple Music 播放队列；保留 Tauri/Three.js 界面。需要开发者资格、匹配的 App ID、用户许可及相应播放权益；本方案功能最低 macOS 14。 | **推荐。** 符合播放器体验，避免把 WebView 的流媒体兼容性作为首版前提。桥接与签名包仍须实测。 |
+| **原生 MusicKit + Swift 桥接** | Rhine 自己管理 Apple Music 播放队列；保留 Tauri/Three.js 界面。本机 ad-hoc 有限读库/播放已通过，需用户许可和相应歌曲权益，正式身份/分发另验；功能最低 macOS 14。 | **推荐。** 符合播放器体验，避免把 WebView 的流媒体兼容性作为首版前提。桥接与签名包仍须实测。 |
 | **控制本机“音乐”App** | Rhine 显示它的资料库，向它发送播放命令；音乐 App 承担播放并共享当前歌曲/队列，用户在两边操作会互相影响。需要安装并配置好音乐 App，用户授予自动化许可。 | 若接受“Rhine 是遥控界面”，值得独立验证。此路线本身不调用 MusicKit 云 API、不需该 API 的开发者令牌；正式分发的签名/公证成本另算。不能把脚本的资料库搜索当作全站目录搜索。 |
 | **MusicKit JS 放进 WebView** | Apple 支持在网页内授权、搜索和播放，需要开发者令牌；前端复用程度高。 | 普通浏览器支持不能证明 Tauri 的 WKWebView 和 `tauri://localhost` 环境可用。登录窗口、会话、origin、受保护播放和 CSP 都待验证，不选作本轮推荐首版。[官方 Web 入口](https://developer.apple.com/musickit/)、[Web v3 文档](https://js-cdn.music.apple.com/musickit/v3/docs/index.html?path=/docs/get-started--page) |
 
@@ -44,7 +46,7 @@
 
 ## 推荐首版与当前项目的关系
 
-建议下一项实现只做一个闭环：**连接 Apple Music → 浏览个人歌单 → 搜索目录歌曲 → 点播 → 暂停、切歌、拖动进度 → 显示授权/订阅/不可播原因**。先只读，不写回或合并平台歌单，不做下载。切换到 QQ 或本地音乐时先停止 Apple Music，反向同理；首版不做跨来源混合队列、自动匹配下载或音乐驱动的实时音频分析。
+建议下一项实现只做一个闭环：**连接 Apple Music → 浏览个人歌单 → 点播 → 暂停、切歌、拖动进度 → 显示授权/不可播原因**。先只读，不写回或合并平台歌单，不做下载。切换到 QQ 或本地音乐时先停止 Apple Music，反向同理；首版不做目录搜索、跨来源混合队列、自动匹配下载或音乐驱动的实时音频分析。
 
 现有接入点足够开始，不需要先建大型音乐平台框架：
 
@@ -58,8 +60,8 @@
 
 初稿（2026-10-05）已完成官方资料与源码只读核对；本机 SDK **26.2** 的 `MusicKit.swiftinterface` 确认：`MusicAuthorization`、`MusicCatalogSearchRequest` 从 macOS 12 可用，`MusicLibraryRequest`、`ApplicationMusicPlayer` 从 macOS 14 可用，`SystemMusicPlayer` 在 macOS unavailable。核对文件位于 SDK 的 `System/Library/Frameworks/MusicKit.framework/Versions/A/Modules/MusicKit.swiftmodule/arm64e-apple-macos.swiftinterface`；遥控接口来自 Music App 的 `Contents/Resources/com.apple.Music.sdef`。初稿仅读官方安装文件；2026-10-07 后续正常授权的有限库读取和播放以上方实测更新为准。
 
-**仍未验证**：真实用户歌单及顺序、目录搜索与自动 token、拒绝/撤销授权、完整音频主观听感、自动跨来源互斥、重启及实际分发包。库读取、个人本地样本和云订阅中段样本播放已实测，不能再列为全部未知。
+**仍未验证**：重复条目通用定位、目录搜索与自动 token、拒绝/撤销授权、完整音频主观听感、自动跨来源互斥、重启及实际分发包。库读取、个人本地样本、云订阅样本及真实歌单中段自动续播已实测，不能再列为全部未知。
 
-下一步在现有原型读取用户选定的一个已有 Playlist 并验证其真实顺序和中段自动续播，完成独立复核后再桥接进隔离 Rhine 包。目录搜索属于额外能力，需另验身份条件，不能作为本地库首版的前置门槛。若遇真实平台拒绝，记录错误再决定所需配置，不先购买或修改账户。
+下一步完成同包独立复核与停止竞态定向修复，再按原生和界面拆分任务桥接进隔离 Rhine 包。最小接入契约见原生验证报告。目录搜索属于额外能力，需另验身份条件，不能作为本地库首版的前置门槛。若遇真实平台拒绝，记录错误再决定所需配置，不先购买或修改账户。
 
 当前建议继续独立原生播放器路线；需要产品确认的是它与 Music.app 各自播放、以及与 QQ/本地来源切换的交互方式。会员、签名和正式分发问题按实际接口需求分别决策，不再沿用初稿“开发者会员前提或退回遥控”的二选一。

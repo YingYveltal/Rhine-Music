@@ -16,7 +16,7 @@ python3 probes/apple-musickit/build.py
 
 公开依据：本机 SDK 的 MusicKit.swiftinterface，Apple [MusicAuthorization](https://developer.apple.com/documentation/musickit/musicauthorization)、[MusicLibraryRequest](https://developer.apple.com/documentation/musickit/musiclibraryrequest)、[ApplicationMusicPlayer](https://developer.apple.com/documentation/musickit/applicationmusicplayer)，以及 [DTS 对 App Service 与 entitlement 的说明](https://developer.apple.com/forums/thread/784114)。该说明不能替代本机运行验证。
 
-真实歌单入口：读取最多10个现有库 Playlist，选一个读取 `.entries`（`preferredSource: .library`）。保留返回顺序、重复条目及 `position`，最多250条，记录分页/截断，不排序或去重。选择表格行后，以完整已读取条目构建独立队列并从该行开始；这是显式 `Queue(entries, startingAt:)`，不是假定已测过 `Queue(playlist:startingAt:)`。首选 library 不保证 SDK 完全不联网，若返回平台拒绝照实记录。
+真实歌单入口：读取最多10个现有库 Playlist，选一个读取 `.entries`（`preferredSource: .library`）。保留返回顺序、重复条目及 `position`，最多250条，记录分页/截断，不排序或去重。选择表格行后，以完整已读取条目构建独立队列并从该行开始；当前使用 `.tracks` 的 typed `Queue(for: tracks, startingAt:)`，先前两种失败构造记录在后文。首选 library 不保证 SDK 完全不联网，若返回平台拒绝照实记录。
 
 原型播放、继续、前后切均带命令代次；暂停/停止使在途命令过期，取消 Task 并在 await 返回后重新应用最新意图。停止锁存独立的 stopped 意图，继续/前后切不能开启已停止队列，须重新点播；底层可能保留队列与位置，不宣称已经清空。定时状态读取仅重申明确的暂停/停止意图，不根据曲尾猜测补播。这是实验内的明确停止语义；不能从代码推出 SDK 内部绝对无瞬态晚起播，也不是已验收媒体键/产品交互。日志保存队列代次、构造序号/源 ID/运行时 entryID 映射，以及解析后歌曲 ID 和只读随机/重复模式；ID 别名变化不作为换曲触发器。
 
