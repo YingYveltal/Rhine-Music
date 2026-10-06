@@ -51,6 +51,7 @@ import { setupMusicRuler } from "./music-ruler";
 import { MusicPresentation, type AlbumSelection } from "./music-presentation";
 import { MusicTrackFocus } from "./music-track-focus";
 import { mountQqPanel } from "./qq-music";
+import { mountApplePanel } from "./apple-music";
 import { MusicBoot } from "./music-boot";
 import { viewportLayout } from "./viewport-layout";
 
@@ -225,7 +226,7 @@ stage.innerHTML = `
     <div class="card-caption"><span id="detail-card-id"></span><small>拖动卡片，查看完整封面</small></div>
     <article id="album-detail-content" tabindex="-1"></article>
   </section>
-  <div id="music-empty" class="music-empty" hidden><small>YOUR PRIVATE COLLECTION</small><h1>让音乐进入这座档案馆。</h1><p>连接 QQ 音乐或选择本地音乐文件夹，让歌单和专辑进入卡片架。</p><button data-action="library">连接我的音乐 ↗</button><button data-action="demo" class="subtle">先查看演示封面</button></div>
+  <div id="music-empty" class="music-empty" hidden><small>YOUR PRIVATE COLLECTION</small><h1>让音乐进入这座档案馆。</h1><p>连接 Apple Music、QQ 音乐或选择本地音乐文件夹，让歌单和专辑进入卡片架。</p><button data-action="library">连接我的音乐 ↗</button><button data-action="demo" class="subtle">先查看演示封面</button></div>
   <div class="music-bottomline"><span>LOCAL COLLECTION <i>·</i> <span id="library-count">0 ALBUMS</span></span><span id="runtime-info">THREE.JS / LOCAL</span></div>
   <div id="music-panel-root"></div><div id="music-toast" role="status" aria-live="polite"></div>
   <div id="music-loading"><span class="loading-orbit"></span><strong>OPENING THE ARCHIVE</strong><small>正在载入三维专辑架</small></div>
@@ -507,7 +508,7 @@ async function loadLibrary(force = false) {
     () => void loadLibrary(),
     library.scan.running ||
       library.enrich?.running ||
-      library.introductions?.running || library.qq?.job.running
+      library.introductions?.running || library.qq?.job.running || library.apple?.job.running
       ? 1400
       : 12000,
   );
@@ -621,6 +622,8 @@ function updateStatus() {
     tracks = library.albums.reduce((sum, a) => sum + a.tracks.length, 0);
   const label = !apiAvailable
     ? "本地音乐服务尚未连接"
+    : library.apple?.job.running
+      ? `${library.apple.job.message || "同步 Apple Music 歌单"}…`
     : library.qq?.job.running
       ? `${library.qq.job.message || "同步 QQ 曲库"}…`
       : library.scan.running
@@ -638,11 +641,11 @@ function updateStatus() {
     "working",
     !!library.scan.running ||
       !!library.enrich?.running ||
-      !!library.introductions?.running || !!library.qq?.job.running,
+      !!library.introductions?.running || !!library.qq?.job.running || !!library.apple?.job.running,
   );
   $("#library-count").textContent = demo
     ? "DEMONSTRATION"
-    : `${n} ALBUMS / ${tracks} TRACKS`;
+    : `${n} ${library.albums.some(a => a.source === "apple") ? "COLLECTIONS" : "ALBUMS"} / ${tracks} TRACKS`;
 }
 function updateSelection(navigation?: ArchiveNavigation) {
   const a = currentAlbum();
@@ -668,10 +671,10 @@ function updateSelection(navigation?: ArchiveNavigation) {
       genreName: archiveColumns[location.lane],
       format: demo
         ? "DEMO"
-        : [...new Set(a.tracks.map((t) => t.format))].join(" / "),
+        : a.source === "apple" ? "Apple Music 歌单" : [...new Set(a.tracks.map((t) => t.format))].join(" / "),
       artist: a.artist,
       meta: [
-        a.year ? String(a.year) : "年份未提供",
+        a.source === "apple" ? "个人歌单" : a.year ? String(a.year) : "年份未提供",
         demo ? "演示封面" : `${a.tracks.length} 首曲目`,
         a.tracks.length ? time(albumDuration(a)) : "",
       ]
@@ -819,7 +822,8 @@ function renderDetail() {
   const a = currentAlbum();
   if (!a) return;
   trackFocus.cancel();
-  const discs =
+  const apple = a.source === "apple";
+  const discs = apple ? 1 :
     a.discCount || Math.max(1, ...a.tracks.map((t) => t.discNumber || 1));
   const bits =
     a.tracks.length && a.tracks.every((t) => t.lossless === false)
@@ -836,7 +840,11 @@ function renderDetail() {
     a.tracks.map((t) => t.bitrate),
     (n) => `${Math.round(n / 1000)} kbps`,
   );
-  const fields = [
+  const fields = apple ? [
+    ["SOURCE / 来源", "Apple Music 歌单"],
+    ["TRACKS / 曲目", `${a.tracks.length} 首${a.complete === false ? "（部分内容）" : ""}`],
+    ["DURATION / 总时长", time(albumDuration(a))],
+  ] : [
     ["RELEASE / 发行年份", a.year || "未提供"],
     ["ARTIST / 歌手", a.artist],
     ["GENRE / 流派", genreName(a.genreId)],
@@ -850,10 +858,10 @@ function renderDetail() {
     sameAlbum = detailIdentity === a.id,
     scroll = sameAlbum ? article.scrollTop : 0;
   detailIdentity = a.id;
-  article.innerHTML = `<div class="detail-overline"><span>ALBUM ${String(selected + 1).padStart(3, "0")}</span><div class="detail-album-navigation" role="group" aria-label="切换专辑"><button data-action="prev" aria-label="上一张专辑">↑ 上一张</button><button data-action="next" aria-label="下一张专辑">下一张 ↓</button></div></div>
-    <h1 title="${esc(a.title)}">${albumTitleMarkup(a.title)}</h1><p class="detail-artist">${esc(a.artist)}${a.offline ? '<span class="offline-badge">目录离线</span>' : ""}</p>
+  article.innerHTML = `<div class="detail-overline"><span>${apple ? "PLAYLIST" : "ALBUM"} ${String(selected + 1).padStart(3, "0")}</span><div class="detail-album-navigation" role="group" aria-label="切换专辑"><button data-action="prev" aria-label="上一张专辑">↑ 上一张</button><button data-action="next" aria-label="下一张专辑">下一张 ↓</button></div></div>
+    <h1 title="${esc(a.title)}">${albumTitleMarkup(a.title)}</h1><p class="detail-artist">${esc(a.artist)}${!apple && a.offline ? '<span class="offline-badge">目录离线</span>' : ""}</p>
     <div class="album-facts">${fields.map(([name, value]) => `<div><small>${name}</small><span>${esc(String(value))}</span></div>`).join("")}</div>
-    <div class="music-tabs" role="tablist" aria-label="专辑信息"><button role="tab" id="tab-tracks" data-tab="tracks" tabindex="${activeTab === "tracks" ? 0 : -1}" aria-selected="${activeTab === "tracks"}" aria-controls="album-tab-content"><span>01</span> 歌单</button><button role="tab" id="tab-about" data-tab="about" tabindex="${activeTab === "about" ? 0 : -1}" aria-selected="${activeTab === "about"}" aria-controls="album-tab-content"><span>02</span> 专辑介绍</button><i class="music-tab-indicator" aria-hidden="true"></i></div>
+    <div class="music-tabs" role="tablist" aria-label="专辑信息"><button role="tab" id="tab-tracks" data-tab="tracks" tabindex="${activeTab === "tracks" ? 0 : -1}" aria-selected="${activeTab === "tracks"}" aria-controls="album-tab-content"><span>01</span> 歌单</button><button role="tab" id="tab-about" data-tab="about" tabindex="${activeTab === "about" ? 0 : -1}" aria-selected="${activeTab === "about"}" aria-controls="album-tab-content"><span>02</span> ${apple ? "歌单信息" : "专辑介绍"}</button><i class="music-tab-indicator" aria-hidden="true"></i></div>
     <div id="album-tab-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === "tracks" ? trackList(a, discs) : albumAbout(a)}</div>`;
   article.scrollTop = scroll;
   syncTabIndicator(false);
@@ -864,22 +872,28 @@ function renderDetail() {
   updatePlayingRows();
 }
 function trackList(a: MusicAlbum, discs: number) {
+  const apple = a.source === "apple";
+  if (apple) discs = 1;
+  const notice = apple && (a.complete === false || a.loadError)
+    ? `<p role="status">${esc(a.loadError || "歌单尚未完整同步，仅显示已读取的曲目。")}</p><button data-action="library" class="text-button">重新同步歌单 ↗</button>` : "";
+  if (apple && !a.tracks.length) return `<div class="empty-tracks"><strong>${a.complete === false || a.loadError ? "歌单尚未完整读取" : "这个歌单暂时没有歌曲"}</strong>${notice || '<p>可在“音乐”App 中添加歌曲后重新同步。</p><button data-action="library">打开音乐库 ↗</button>'}</div>`;
   if (!a.tracks.length)
     return `<div class="empty-tracks"><strong>${demo ? "这是一张封面演示卡片" : "这个专辑还没有可播放曲目"}</strong><p>${demo ? "用于检查封面原始比例与卡片材质。扫描本地音乐库后，这里会显示真实曲目。" : "请检查音乐文件是否完整，并重新扫描音乐库。"}</p><button data-action="library">打开音乐库设置 ↗</button></div>`;
   let disc = -1;
-  return `<div class="track-list" aria-label="专辑歌曲列表">${a.tracks
+  return `${notice}<div class="track-list" aria-label="${apple ? "歌单" : "专辑"}歌曲列表">${a.tracks
     .map((t, index) => {
-      const discNo = t.discNumber || 1;
+      const discNo = apple ? 1 : t.discNumber || 1;
       const head =
         discs > 1 && discNo !== disc
           ? `<div class="disc-heading">DISC ${String(discNo).padStart(2, "0")}</div>`
           : "";
       disc = discNo;
-      return `${head}<button class="track-row" data-track="${esc(t.id)}" ${a.offline ? "disabled" : ""} aria-label="播放 ${esc(t.title)}"><span class="track-number">${String(t.trackNumber || index + 1).padStart(2, "0")}</span><span class="track-name"><strong>${esc(t.title)}</strong><small>${esc(t.artist)}</small></span><span class="track-format">${esc(t.format)}${!t.browserPlayable ? '<i title="需要兼容的播放内核"> ↗</i>' : ""}</span><span class="track-duration">${t.duration > 0 ? time(t.duration) : "—"}</span></button>`;
+      return `${head}<button class="track-row" data-track="${esc(t.id)}" ${(!apple && a.offline) || (apple && !isNative) ? "disabled" : ""} aria-label="播放 ${esc(t.title)}"><span class="track-number">${String(apple ? index + 1 : t.trackNumber || index + 1).padStart(2, "0")}</span><span class="track-name"><strong>${esc(t.title)}</strong><small>${esc(t.artist)}</small></span><span class="track-format">${esc(apple ? "Apple Music" : t.format)}${!apple && !t.browserPlayable ? '<i title="需要兼容的播放内核"> ↗</i>' : ""}</span><span class="track-duration">${t.duration > 0 ? time(t.duration) : "—"}</span></button>`;
     })
     .join("")}</div>${producerBlock(a)}`;
 }
 function albumAbout(a: MusicAlbum) {
+  if (a.source === "apple") return `<section class="album-about"><small>APPLE MUSIC · 个人歌单</small><p>${esc(a.description || "来自自己的 Apple Music 音乐资料库。")}</p>${a.complete === false || a.loadError ? `<p>${esc(a.loadError || "此歌单尚未完整同步。")}</p>` : ""}</section>`;
   if (a.id.startsWith("qq-")) return `<section class="album-about"><small>QQ MUSIC</small><p>${esc(a.description || "来自 QQ 音乐")}</p><p>歌曲顺序及重复条目保持歌单原样。缺少在线编号的曲目可通过本地文件导入播放。</p></section>`;
   return `<section class="album-about"><small>ABOUT THIS ALBUM</small>
     ${a.description ? `<p>${esc(a.description)}</p>${a.descriptionSource ? `<a class="text-button" href="${esc(a.descriptionSource.url)}" target="_blank" rel="noopener">来源：${esc(a.descriptionSource.name)} ↗</a>${a.descriptionSource.license ? `<small class="introduction-license">${esc(a.descriptionSource.license)}</small>` : ""}` : ""}` : `<h3>专辑介绍待补充</h3><p>从公开百科核对专辑与歌手后读取介绍，附上来源并保存在本机。无法确认对应专辑时保留空白。</p>`}
@@ -900,13 +914,14 @@ function introductionAlbumStatus(a: MusicAlbum) {
   return "尚未查询专辑介绍。";
 }
 function updateIntroductionStatus() {
+  const eligibleAlbums = library.albums.filter(a => a.source !== "apple");
   const job = library.introductions;
   const running = introductionsStarting || !!job?.running;
   const button = document.querySelector<HTMLButtonElement>(
     "#introduction-refresh",
   );
   if (button) {
-    button.disabled = running || !apiAvailable || !library.albums.length;
+    button.disabled = running || !apiAvailable || !eligibleAlbums.length;
     button.textContent = running
       ? "正在查询专辑介绍…"
       : "查询 / 更新专辑介绍 ↗";
@@ -936,19 +951,19 @@ function updateIntroductionStatus() {
     if (introductionsStarting && !job?.running)
       progress.removeAttribute("value");
   }
-  const missing = library.albums.filter((album) => !album.description?.trim());
+  const missing = eligibleAlbums.filter((album) => !album.description?.trim());
   const coverage = document.querySelector<HTMLElement>(
     "#introduction-coverage",
   );
   if (coverage)
-    coverage.textContent = `已有介绍 ${library.albums.length - missing.length} / ${library.albums.length} 张 · 尚缺 ${missing.length} 张`;
+    coverage.textContent = `已有介绍 ${eligibleAlbums.length - missing.length} / ${eligibleAlbums.length} 张 · 尚缺 ${missing.length} 张`;
   const status = document.querySelector<HTMLElement>("#introduction-status");
   if (status)
     status.textContent = !apiAvailable
       ? "本地音乐服务尚未连接，连接后可查询介绍。"
       : introductionRequestError
         ? `无法开始查询：${introductionRequestError}`
-        : !library.albums.length
+        : !eligibleAlbums.length
           ? "扫描本地音乐文件夹后，即可查询专辑介绍。"
           : introductionsStarting
             ? "正在提交专辑介绍查询…"
@@ -975,7 +990,7 @@ function updateIntroductionStatus() {
   }
 }
 function producerBlock(a: MusicAlbum) {
-  if (a.id.startsWith("qq-")) return "";
+  if (a.source === "apple" || a.id.startsWith("qq-")) return "";
   return `<section class="producer-section"><div><small>ALBUM CREDITS / 制作人员</small>${!demo ? '<button data-action="enrich-album">补充在线资料 ↗</button>' : ""}</div>${a.producers.length ? `<dl>${a.producers.map((p) => `<div><dt>${esc(p.role)}${p.trackTitle ? ` · ${esc(p.trackTitle)}` : ""}</dt><dd>${esc(p.name)}</dd></div>`).join("")}</dl>` : "<p>暂无制作资料。本地标签优先，MusicBrainz 资料可查询并缓存在本机。</p>"}${a.online?.status === "uncertain" ? "<p>找到多个可能的发行版本，暂未自动采用资料。</p>" : ""}${a.online?.error ? `<p>${esc(a.online.error)}</p>` : ""}</section>`;
 }
 function updatePlayingRows() {
@@ -987,6 +1002,19 @@ function updatePlayingRows() {
       row.setAttribute("aria-current", String(active));
     });
 }
+function updatePlaybackCapabilities() {
+  const caps = playerState?.capabilities;
+  const volume = document.querySelector<HTMLInputElement>("#volume");
+  const fade = document.querySelector<HTMLInputElement>("#song-fade-setting");
+  if (volume && volume.disabled !== (caps?.volume === false)) volume.disabled = caps?.volume === false;
+  if (fade && fade.disabled !== (caps?.fade === false)) fade.disabled = caps?.fade === false;
+  const note = document.querySelector<HTMLElement>("#playback-capability-note");
+  if (note) {
+    const unavailable = [caps?.volume === false ? "歌曲音量" : "", caps?.fade === false ? "切歌淡入淡出" : ""].filter(Boolean);
+    const text = unavailable.length ? `当前播放不支持在这里调节${unavailable.join("和")}；本地音乐和 QQ 音乐的设置已保留。` : "";
+    if (note.textContent !== text) note.textContent = text;
+  }
+}
 let lastPlayerError = "";
 let lastPlayerView = "";
 const transportTitleMotion = setupTransportTitle(
@@ -996,9 +1024,10 @@ const transportTitleMotion = setupTransportTitle(
 transportTitleMotion.setReduced(preferences.reduced);
 player.subscribe((state) => {
   playerState = state;
+  updatePlaybackCapabilities();
   const seek = $<HTMLInputElement>("#track-seek");
   seek.max = String(Math.max(1, state.duration));
-  seek.disabled = state.loading || !state.duration;
+  seek.disabled = state.loading || !state.duration || state.capabilities?.seek === false;
   if (document.activeElement !== seek) seek.value = String(state.currentTime);
   $("#track-time").textContent = state.loading ? "正在载入…" : `${time(state.currentTime)} / ${time(state.duration)}`;
   const view = JSON.stringify([state.currentTrack?.id,state.currentTrack?.title,state.playing,state.transport,state.error]);
@@ -1015,7 +1044,7 @@ player.subscribe((state) => {
   $("#play-pause").title = state.currentTrack
     ? `${state.playing ? "暂停" : "播放"}：${state.currentTrack.title}`
     : "播放当前专辑";
-  if (state.error && state.error !== lastPlayerError) notify(state.error);
+  if (state.error && state.error !== lastPlayerError) notify(state.currentTrack ? `「${state.currentTrack.title}」：${state.error}` : state.error);
   lastPlayerError = state.error || "";
   updatePlayingRows();
 });
@@ -1023,11 +1052,13 @@ player.subscribe((state) => {
 $("#track-seek").addEventListener("change", e => player.seek(Number((e.target as HTMLInputElement).value)));
 let panelFocus: HTMLElement | null = null;
 let disposeQqPanel: (() => void) | undefined;
+let disposeApplePanel: (() => void) | undefined;
 let panelTransition: SurfaceTransition | undefined,
   panelClosing = false,
   pendingPanelAfter: (() => void) | undefined;
 function closePanel(after?: () => void) {
   disposeQqPanel?.(); disposeQqPanel = undefined;
+  disposeApplePanel?.(); disposeApplePanel = undefined;
   if (!panel) {
     after?.();
     return;
@@ -1059,6 +1090,7 @@ function closePanel(after?: () => void) {
 function openPanel(next: Panel) {
   if (!next) return closePanel();
   disposeQqPanel?.(); disposeQqPanel = undefined;
+  disposeApplePanel?.(); disposeApplePanel = undefined;
   cancelTrackReveal();
   panelTransition?.dispose();
   pendingPanelAfter = undefined;
@@ -1101,6 +1133,18 @@ function renderLibraryPanel() {
     $("#panel-body").prepend(qqSection);
     disposeQqPanel = mountQqPanel(qqSection, async () => { await receiveLibrary(await request<MusicLibrary>("/api/library")); }, id => revealAlbum(id));
   }
+  const appleSection = document.createElement("section");
+  appleSection.id = "apple-connection"; appleSection.className = "panel-section";
+  $("#panel-body").prepend(appleSection);
+  disposeApplePanel = mountApplePanel(appleSection, async () => {
+    // Invalidate a GET begun before this accepted action.
+    const version = ++libraryStateVersion;
+    const next = await request<MusicLibrary>("/api/library");
+    if (version !== libraryStateVersion) return;
+    await receiveLibrary(next);
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(() => void loadLibrary(), 1400);
+  });
   updateScanStatus();
   const configSection = document.createElement("section");
   configSection.className = "panel-section";
@@ -1175,10 +1219,11 @@ function renderSettingsPanel() {
     ${qualityMarkup(renderQuality)}
     <section class="panel-section"><label class="settings-row"><span>流畅优先（实验）<small>运动时降低三维分辨率，停稳后恢复；文字、材质与动画保持原设置。开启后使用标准渲染。</small></span><input type="checkbox" id="smooth-motion" ${preferences.smoothMotion ? "checked" : ""}></label></section>
     <section class="panel-section"><h3>动效与显示</h3><label class="settings-row"><span>减少动态效果<small>简化镜头、文字加载和页签过渡</small></span><input type="checkbox" id="reduced-motion" ${preferences.reduced ? "checked" : ""}></label><button class="text-button" data-action="fullscreen">切换全屏 ↗</button></section>
-    <section class="panel-section"><h3>声音</h3><label class="settings-row"><span>歌曲音量</span><input type="range" id="volume" aria-label="歌曲音量" min="0" max="100" value="${Math.round(preferences.volume * 100)}"></label><label class="settings-row"><span>切歌淡入淡出<small>当前歌曲先淡出，再淡入下一首</small></span><input type="checkbox" id="song-fade-setting" ${preferences.songFade ? "checked" : ""}></label><label class="settings-row"><span>界面音效<small>玻璃卡片与终端操作</small></span><input type="checkbox" id="sound-setting" ${preferences.sound ? "checked" : ""}></label><label class="settings-row"><span>音效音量</span><input type="range" id="sound-volume" aria-label="音效音量" min="0" max="100" value="${Math.round(preferences.soundVolume * 100)}"></label><label class="settings-row"><span>氛围 BGM<small>专辑开始前淡出，停止后淡入</small></span><input type="checkbox" id="bgm-setting" ${preferences.bgm ? "checked" : ""}></label><label class="settings-row"><span>BGM 音量</span><input type="range" id="bgm-volume" aria-label="BGM 音量" min="0" max="100" value="${Math.round(preferences.bgmVolume * 100)}"></label><button class="text-button" data-action="sound-preview">试听界面音效 ↗</button><p>${isNative ? "macOS 桌面版：Rust 负责曲库、播放、缓存及后台任务；界面使用系统 WebView 与原版 Three.js。DSF / DFF 暂不支持播放。" : "当前版本支持 macOS，使用浏览器播放本地音乐。DSF / DFF 暂不支持播放，其他格式取决于浏览器解码能力。"}</p></section>
+    <section class="panel-section"><h3>声音</h3><p id="playback-capability-note" role="status"></p><label class="settings-row"><span>歌曲音量</span><input type="range" id="volume" aria-label="歌曲音量" min="0" max="100" value="${Math.round(preferences.volume * 100)}"></label><label class="settings-row"><span>切歌淡入淡出<small>当前歌曲先淡出，再淡入下一首</small></span><input type="checkbox" id="song-fade-setting" ${preferences.songFade ? "checked" : ""}></label><label class="settings-row"><span>界面音效<small>玻璃卡片与终端操作</small></span><input type="checkbox" id="sound-setting" ${preferences.sound ? "checked" : ""}></label><label class="settings-row"><span>音效音量</span><input type="range" id="sound-volume" aria-label="音效音量" min="0" max="100" value="${Math.round(preferences.soundVolume * 100)}"></label><label class="settings-row"><span>氛围 BGM<small>专辑开始前淡出，停止后淡入</small></span><input type="checkbox" id="bgm-setting" ${preferences.bgm ? "checked" : ""}></label><label class="settings-row"><span>BGM 音量</span><input type="range" id="bgm-volume" aria-label="BGM 音量" min="0" max="100" value="${Math.round(preferences.bgmVolume * 100)}"></label><button class="text-button" data-action="sound-preview">试听界面音效 ↗</button><p>${isNative ? "Apple Music 使用系统音乐播放服务。本地音乐的 DSF / DFF 格式暂不支持播放。" : "当前版本支持 macOS，使用浏览器播放本地音乐。DSF / DFF 暂不支持播放，其他格式取决于浏览器解码能力。"}</p></section>
     <section class="panel-section"><h3>开发与资源</h3><p>音乐适配与维护：<a href="https://github.com/RonaldDeng/Rhine-Music-Demo" target="_blank" rel="noopener">RonaldDeng ↗</a><br>原版界面：<a href="https://github.com/LBEILC/RhineLabUI" target="_blank" rel="noopener">LBEILC / RhineLabUI ↗</a></p><p><a href="/licenses/project-mit.txt" target="_blank" rel="noopener">代码 MIT 许可 ↗</a> · <a href="https://github.com/RonaldDeng/Rhine-Music-Demo/blob/v0.2.0/NOTICE.md" target="_blank" rel="noopener">版权与资源说明 ↗</a></p><a href="/?original=1&scene=archive" target="_blank" rel="noopener">打开原版档案界面 ↗</a><p><a href="/fonts/MiSans-license.pdf" target="_blank" rel="noopener">MiSans 字体许可 ↗</a></p></section>`;
   updateQuality();
   updateIntroductionStatus();
+  updatePlaybackCapabilities();
 }
 function updateQuality() {
   renderQuality = normalizeQuality(renderQuality);
@@ -1197,6 +1242,7 @@ async function editGenres() {
     const rules = await request<GenreRules>("/api/genre-rules");
     if (!body?.isConnected || panel !== "library") return;
     disposeQqPanel?.(); disposeQqPanel = undefined;
+    disposeApplePanel?.(); disposeApplePanel = undefined;
     body.innerHTML = `<p class="panel-intro">这里编辑展示流派、别名和专辑人工分类。保存后重新归并本地索引，不修改音频标签。</p><label class="field-label" for="genre-json">本地流派规则</label><textarea id="genre-json" class="json-editor" spellcheck="false">${esc(JSON.stringify(rules, null, 2))}</textarea><div class="panel-actions"><button data-action="save-genres" class="primary-button">保存并应用</button><button data-action="library">返回音乐库</button></div><p id="genre-error" role="alert"></p>`;
   } catch (error) {
     notify((error as Error).message);
@@ -1251,11 +1297,12 @@ async function scan(saveRoots = false) {
   }
 }
 async function enrich(one = false) {
-  if (demo) return;
+  const eligible = (one ? [currentAlbum()] : library.albums).filter((a): a is MusicAlbum => !!a && a.source !== "apple");
+  if (demo || !eligible.length) return;
   try {
     await request(
       "/api/library/enrich",
-      one ? { albumIds: [currentAlbum()!.id] } : {},
+      { albumIds: eligible.map(a => a.id) },
     );
     notify("已开始补充流派和制作资料，结果将缓存在本机。");
     await loadLibrary();
@@ -1265,7 +1312,8 @@ async function enrich(one = false) {
 }
 async function queryIntroductions(one = false) {
   const album = currentAlbum();
-  if (demo || !library.albums.length || (one && !album)) return;
+  const eligible = (one ? [album] : library.albums).filter((a): a is MusicAlbum => !!a && a.source !== "apple");
+  if (demo || !eligible.length) return;
   if (introductionsStarting || library.introductions?.running) {
     notify("专辑介绍正在查询，进度可在设置中查看。");
     return;
@@ -1275,7 +1323,7 @@ async function queryIntroductions(one = false) {
   updateIntroductionStatus();
   try {
     const next = await request<MusicLibrary>("/api/library/introductions", {
-      ...(one ? { albumIds: [album!.id] } : {}),
+      albumIds: eligible.map(a => a.id),
       force: true,
     });
     // A GET started before this accepted job must not restore an older snapshot.
@@ -1303,7 +1351,11 @@ async function queryIntroductions(one = false) {
 }
 function playAlbum(id?: string) {
   const a = currentAlbum();
-  if (!a?.tracks.length || a.offline) return;
+  if (!a?.tracks.length || (a.source !== "apple" && a.offline)) return;
+  if (a.source === "apple" && (!isNative || library.apple?.supported === false)) {
+    notify(!isNative ? "请在 macOS 桌面应用中播放 Apple Music。" : library.apple?.unavailableReason || "Apple Music 需要 macOS 14 或更新版本。");
+    return;
+  }
   void player.play(id || a.tracks[0].id, a.tracks);
 }
 
@@ -1496,6 +1548,7 @@ document.addEventListener("input", (e) => {
   }
   if (el.id === "album-search") renderSearchResults();
   if (el.id === "volume") {
+    if (playerState.capabilities?.volume === false) return;
     preferences.volume = Number(el.value) / 100;
     player.setVolume(preferences.volume);
     savePrefs();
@@ -1539,6 +1592,7 @@ document.addEventListener("change", (e) => {
     savePrefs();
   }
   if (el.id === "song-fade-setting") {
+    if (playerState.capabilities?.fade === false) return;
     preferences.songFade = el.checked;
     player.setSongFadeEnabled(el.checked);
     savePrefs();

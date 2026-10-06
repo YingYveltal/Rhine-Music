@@ -1,5 +1,6 @@
 /** JSON contract shared by the local music service and the visual interface. */
 export interface MusicTrack {
+  source?: 'local' | 'qq' | 'apple';
   id: string;
   albumId: string;
   title: string;
@@ -28,6 +29,10 @@ export interface MusicProducer {
 }
 
 export interface MusicAlbum {
+  source?: 'local' | 'qq' | 'apple';
+  kind?: 'album' | 'playlist';
+  complete?: boolean;
+  loadError?: string | null;
   id: string;
   title: string;
   artist: string;
@@ -86,6 +91,7 @@ export interface LibraryRoot {
 }
 
 export interface MusicLibrary {
+  apple?: import('./apple-status').AppleStatus;
   qq?: import("./qq-music").QqStatus;
   version: 1;
   albums: MusicAlbum[];

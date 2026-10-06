@@ -70,6 +70,10 @@ type Options = {
   bgmEnabled?: boolean;
 };
 type NativeState = {
+  source?: MusicPlayerState['source'];
+  currentIndex?: number;
+  queueGeneration?: number;
+  capabilities?: MusicPlayerState['capabilities'];
   track: MusicTrack | null;
   playing: boolean;
   elapsed: number;
@@ -88,6 +92,7 @@ export class NativeMusicPlayer {
   private generation = 0;
   private commands = Promise.resolve();
   private pending: { sequence: number | null } | null = null;
+  private appliedCommand = 0;
   constructor(options: Options = {}) {
     this.value = {
       transport: "idle",
@@ -106,6 +111,9 @@ export class NativeMusicPlayer {
       error: null,
       bgmError: null,
       backend: "rust",
+      source: null,
+      queueGeneration: 0,
+      capabilities: { seek: true, volume: true, fade: true },
     };
     this.settings();
     void this.poll();
@@ -174,16 +182,25 @@ export class NativeMusicPlayer {
         Object.assign(this.value, { error: state.workerError, transport: "error", playing: false, loading: false });
         this.emit();
       } else if (generation === this.generation && !this.disposed &&
+        state.appliedCommand >= this.appliedCommand &&
+        (state.queueGeneration === undefined || state.appliedCommand > this.appliedCommand || state.source !== this.value.source || state.queueGeneration >= (this.value.queueGeneration ?? 0)) &&
         (!this.pending || (this.pending.sequence !== null && state.appliedCommand >= this.pending.sequence))) {
         this.pending = null;
+        this.appliedCommand = state.appliedCommand;
         const currentTrack = state.track
           ? { ...this.value.queue.find((t) => t.id === state.track!.id), ...state.track }
           : this.value.currentTrack;
+        const index = state.currentIndex;
+        const currentIndex = index !== undefined && this.value.queue[index]?.id === currentTrack?.id
+          ? index : this.value.queue.findIndex(t => t.id === currentTrack?.id);
+        const source = state.source !== undefined ? state.source : state.track?.source ??
+          (state.track ? (state.track.id.startsWith('qq-') ? 'qq' : 'local') : null);
         Object.assign(this.value, {
           currentTrack,
-          currentIndex: this.value.queue.findIndex(
-            (t) => t.id === currentTrack?.id,
-          ),
+          currentIndex,
+          source,
+          queueGeneration: state.queueGeneration ?? this.value.queueGeneration,
+          capabilities: state.capabilities ?? { seek: source !== 'apple', volume: source !== 'apple', fade: source !== 'apple' },
           playing: state.playing,
           currentTime: state.elapsed,
           duration: currentTrack?.duration ?? 0,
@@ -225,6 +242,11 @@ export class NativeMusicPlayer {
     this.generation++;
     this.value.queue = queue;
     this.value.currentTrack = this.value.queue[index];
+    this.value.source = this.value.currentTrack.source ?? (id.startsWith('qq-') ? 'qq' : 'local');
+    // Until the new source is acknowledged, do not expose another source's controls.
+    this.value.capabilities = this.value.source === 'apple'
+      ? { seek: false, volume: false, fade: false }
+      : { seek: true, volume: true, fade: true };
     this.value.currentIndex = index;
     this.value.loading = true;
     this.value.transport = "loading";
@@ -237,6 +259,16 @@ export class NativeMusicPlayer {
     await sent;
   }
   async toggle() {
+    if (this.value.source === 'apple' && this.value.transport === 'paused') {
+      this.generation++;
+      this.value.transport = 'loading';
+      this.value.loading = true;
+      this.value.error = null;
+      const sent = this.send('toggle', {}, true);
+      this.emit();
+      await sent;
+      return;
+    }
     if (
       this.value.transport === "idle" ||
       this.value.transport === "error" ||
@@ -266,19 +298,34 @@ export class NativeMusicPlayer {
     this.emit();
   }
   async next() {
+    if (this.value.source === 'apple' && !['idle', 'error'].includes(this.value.transport)) {
+      await this.skipApple('next');
+      return;
+    }
     const track = this.value.queue[this.value.currentIndex + 1];
     if (track) await this.play(track.id);
     else this.stop();
   }
   async previous() {
     if (this.value.currentTime > 3) this.seek(0);
+    else if (this.value.source === 'apple' && !['idle', 'error'].includes(this.value.transport)) await this.skipApple('previous');
     else {
       const track = this.value.queue[Math.max(0, this.value.currentIndex - 1)];
       if (track) await this.play(track.id);
     }
   }
+  private async skipApple(operation: 'next' | 'previous') {
+    this.generation++;
+    this.value.loading = true;
+    this.value.transport = 'loading';
+    this.value.playing = false;
+    this.value.error = null;
+    const sent = this.send(operation, {}, true);
+    this.emit();
+    await sent;
+  }
   seek(position: number) {
-    if (!Number.isFinite(position)) return;
+    if (!Number.isFinite(position) || this.value.capabilities?.seek === false) return;
     this.generation++;
     this.value.currentTime = Math.max(0, position);
     this.value.error = null;
@@ -286,6 +333,7 @@ export class NativeMusicPlayer {
     this.emit();
   }
   setVolume(value: number) {
+    if (this.value.capabilities?.volume === false) return;
     if (Number.isFinite(value))
       this.value.volume = Math.max(0, Math.min(1, value));
     this.settings();
@@ -300,6 +348,7 @@ export class NativeMusicPlayer {
     this.settings();
   }
   setSongFadeEnabled(enabled: boolean) {
+    if (this.value.capabilities?.fade === false) return;
     this.value.songFadeEnabled = enabled;
     this.settings();
   }
