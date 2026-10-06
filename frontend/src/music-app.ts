@@ -31,6 +31,7 @@ import {
 } from "./render-quality";
 import { MusicPlayer, type MusicPlayerState } from "./music-player";
 import { isNative, nativeInvoke, nativeRequest, NativeMusicPlayer } from "./native";
+import { appendMusicFolders } from "./library-folders";
 import { beginMeasurement, recordInteraction, sampleFrame } from "./performance-probe";
 import { ModelViewer } from "./model-viewer";
 import { TerminalAudio } from "./audio";
@@ -1093,7 +1094,7 @@ function openPanel(next: Panel) {
 }
 function renderLibraryPanel() {
   $("#panel-body").innerHTML =
-    `<p class="panel-intro">根目录中的每首单曲各是一张卡片，优先使用自身内嵌封面。子文件夹按专辑展示，优先使用文件夹封面。</p><label class="field-label" for="music-roots">音乐文件夹<span>多个目录各占一行</span></label><textarea id="music-roots" rows="3" placeholder="/Users/你的用户名/Music">${esc(library.roots.map((r) => r.path).join("\n"))}</textarea><div class="panel-actions"><button class="primary-button" data-action="scan">保存目录并扫描 ↗</button><button data-action="rescan">重新扫描</button></div><div id="scan-status" class="scan-status"></div><div class="library-metrics"><div><b>${library.albums.length}</b><span>专辑</span></div><div><b>${library.albums.reduce((n, a) => n + a.tracks.length, 0)}</b><span>曲目</span></div><div><b>${library.genres.filter((g) => library.albums.some((a) => a.genreId === g.id)).length}</b><span>流派</span></div></div><section class="panel-section"><h3>在线资料与本地分类</h3><p>向 MusicBrainz 查询专辑名称与艺术家，补充流派和制作人员；音乐文件留在本机。已有资料使用缓存，人工分类优先保留。</p><button data-action="enrich-library" class="text-button">补充缺失的在线资料 ↗</button><button data-action="edit-genres" class="text-button">编辑流派归并规则 ↗</button></section><section class="panel-section"><h3>封面显示</h3><p>方形、竖版、横版封面均保持原始比例，完整放入卡片正面。没有封面时显示专辑名称占位，不使用其他专辑的图片。</p>${!library.albums.length ? '<button data-action="demo" class="text-button">查看演示封面 ↗</button>' : ""}</section>`;
+    `<p class="panel-intro">根目录中的每首单曲各是一张卡片，优先使用自身内嵌封面。子文件夹按专辑展示，优先使用文件夹封面。</p><label class="field-label" for="music-roots">音乐文件夹<span>多个目录各占一行</span></label><textarea id="music-roots" rows="3" placeholder="/Users/你的用户名/Music">${esc(library.roots.map((r) => r.path).join("\n"))}</textarea><div class="panel-actions">${isNative ? '<button data-action="pick-folders">选择文件夹…</button>' : ""}<button class="primary-button" data-action="scan">保存目录并扫描 ↗</button><button data-action="rescan">重新扫描</button></div>${isNative ? '<p id="folder-picker-status" role="status" aria-live="polite">可选择多个文件夹；添加后点击“保存目录并扫描”。也可直接编辑上方路径。</p>' : ""}<div id="scan-status" class="scan-status"></div><div class="library-metrics"><div><b>${library.albums.length}</b><span>专辑</span></div><div><b>${library.albums.reduce((n, a) => n + a.tracks.length, 0)}</b><span>曲目</span></div><div><b>${library.genres.filter((g) => library.albums.some((a) => a.genreId === g.id)).length}</b><span>流派</span></div></div><section class="panel-section"><h3>在线资料与本地分类</h3><p>向 MusicBrainz 查询专辑名称与艺术家，补充流派和制作人员；音乐文件留在本机。已有资料使用缓存，人工分类优先保留。</p><button data-action="enrich-library" class="text-button">补充缺失的在线资料 ↗</button><button data-action="edit-genres" class="text-button">编辑流派归并规则 ↗</button></section><section class="panel-section"><h3>封面显示</h3><p>方形、竖版、横版封面均保持原始比例，完整放入卡片正面。没有封面时显示专辑名称占位，不使用其他专辑的图片。</p>${!library.albums.length ? '<button data-action="demo" class="text-button">查看演示封面 ↗</button>' : ""}</section>`;
   if (isNative) {
     const qqSection = document.createElement("section");
     qqSection.id = "qq-connection"; qqSection.className = "panel-section";
@@ -1199,6 +1200,29 @@ async function editGenres() {
     body.innerHTML = `<p class="panel-intro">这里编辑展示流派、别名和专辑人工分类。保存后重新归并本地索引，不修改音频标签。</p><label class="field-label" for="genre-json">本地流派规则</label><textarea id="genre-json" class="json-editor" spellcheck="false">${esc(JSON.stringify(rules, null, 2))}</textarea><div class="panel-actions"><button data-action="save-genres" class="primary-button">保存并应用</button><button data-action="library">返回音乐库</button></div><p id="genre-error" role="alert"></p>`;
   } catch (error) {
     notify((error as Error).message);
+  }
+}
+let pickingFolders = false;
+async function pickMusicFolders() {
+  if (!isNative || pickingFolders) return;
+  const input = document.querySelector<HTMLTextAreaElement>("#music-roots");
+  const button = document.querySelector<HTMLButtonElement>('[data-action="pick-folders"]');
+  const status = document.querySelector<HTMLElement>("#folder-picker-status");
+  if (!input || !button || !status) return;
+  pickingFolders = true;
+  button.disabled = true;
+  try {
+    const selected = await nativeInvoke<string[] | null>("pick_music_folders");
+    if (!input.isConnected) return;
+    if (selected === null) { status.textContent = "已取消，目录输入未改动。"; return; }
+    const merged = appendMusicFolders(input.value, selected);
+    input.value = merged.value;
+    status.textContent = merged.added ? `已添加 ${merged.added} 个文件夹；点击“保存目录并扫描”后生效。` : "所选文件夹已在列表中，未重复添加。";
+  } catch (error) {
+    if (status.isConnected) status.textContent = `未能选择文件夹：${(error as Error).message}。也可手动输入路径。`;
+  } finally {
+    pickingFolders = false;
+    if (button.isConnected) button.disabled = false;
   }
 }
 async function scan(saveRoots = false) {
@@ -1384,6 +1408,9 @@ document.addEventListener("click", (e) => {
       break;
     case "stop":
       player.stop();
+      break;
+    case "pick-folders":
+      void pickMusicFolders();
       break;
     case "scan":
       void scan(true);

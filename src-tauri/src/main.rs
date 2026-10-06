@@ -481,6 +481,23 @@ fn save_benchmark(core: State<'_, Arc<Core>>, report: Value) -> std::result::Res
     ));
     library::atomic_json(&path, &report).map_err(|e| e.to_string())
 }
+// Return selected paths only; saving and scanning retain their existing validation.
+#[tauri::command]
+async fn pick_music_folders(window: tauri::WebviewWindow) -> std::result::Result<Option<Vec<String>>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    tauri::async_runtime::spawn_blocking(move || {
+        let selected = window.dialog().file().set_parent(&window)
+            .set_title("选择音乐文件夹").set_can_create_directories(false).blocking_pick_folders();
+        selected.map(|paths| paths.into_iter().map(|file| {
+            let path = file.into_path().map_err(|e| e.to_string())?;
+            let text = path.to_str().ok_or_else(|| "文件夹路径无法显示为文本".to_string())?;
+            if text.contains(['\n', '\r']) || text.trim() != text {
+                return Err("目录输入暂不支持带换行或首尾空白的路径，请先重命名文件夹".to_string());
+            }
+            Ok(text.to_owned())
+        }).collect::<std::result::Result<Vec<_>, String>>()).transpose()
+    }).await.map_err(|e| e.to_string())?
+}
 #[tauri::command]
 async fn open_link(app: tauri::AppHandle, href: String) -> std::result::Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
@@ -524,6 +541,7 @@ fn assets(app: &tauri::App) -> PathBuf {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             #[cfg(feature = "preview")]
             let data = preview::setup(app)?;
@@ -561,6 +579,7 @@ fn main() {
             save_benchmark,
             save_render_capture,
             open_link,
+            pick_music_folders,
             toggle_fullscreen
         ])
         .run(tauri::generate_context!())
