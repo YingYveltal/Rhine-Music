@@ -15,6 +15,7 @@ export function mountApplePanel(root: HTMLElement, refresh: () => Promise<void>)
   let disposed = false, busy = false, requestVersion = 0;
   let latest: AppleStatus | undefined, timer: ReturnType<typeof setTimeout> | undefined;
   let libraryStamp: string | undefined;
+  let syncFeedbackPending = false;
   const alive = () => !disposed && root.isConnected;
   const call = (operation: string, body: object = {}) => nativeInvoke<AppleStatus>('apple_request', { operation, body });
   const controls = () => {
@@ -39,13 +40,21 @@ export function mountApplePanel(root: HTMLElement, refresh: () => Promise<void>)
         try {
           const s = await call('status');
           if (!alive() || version !== requestVersion) return;
+          const syncFinished = syncFeedbackPending && latest?.job.running && !s.job.running;
           show(s);
+          // Only clear the progress message still owned by this sync. The main
+          // status now supplies the final counts or failure, without erasing a
+          // newer display-setting result or unrelated error.
+          if (syncFinished) { syncFeedbackPending = false; el('feedback').textContent = ''; }
           const stamp = JSON.stringify([s.enabled, s.updatedAt, s.playlistCount, s.trackCount, s.job.running, s.job.error]);
           const changed = libraryStamp !== undefined && stamp !== libraryStamp;
           libraryStamp = stamp;
           if (changed && !s.job.running) await refresh();
         } catch (error) {
-          if (alive() && version === requestVersion) el('feedback').textContent = `无法读取资料库状态：${(error as Error).message}`;
+          if (alive() && version === requestVersion) {
+            syncFeedbackPending = false;
+            el('feedback').textContent = `无法读取资料库状态：${(error as Error).message}`;
+          }
         }
       }
     } finally {
@@ -56,14 +65,18 @@ export function mountApplePanel(root: HTMLElement, refresh: () => Promise<void>)
     if (!alive() || busy) return;
     const allowed = applePanelControls(latest, false);
     if (!allowed[operation]) return;
+    syncFeedbackPending = false;
     busy = true; ++requestVersion; controls(); root.setAttribute('aria-busy', 'true');
     el('feedback').textContent = operation === 'authorize' ? '正在请求音乐资料库访问权限…' : '正在处理…';
     try {
       const s = await call(operation, body); show(s);
       await refresh();
-      if (alive()) el('feedback').textContent = operation === 'sync' && s.job.running
-        ? '正在同步歌单，可以关闭此面板继续浏览。'
-        : operation === 'enable' ? '显示设置已保存。' : '';
+      if (alive()) {
+        syncFeedbackPending = operation === 'sync' && s.job.running;
+        el('feedback').textContent = syncFeedbackPending
+          ? '正在同步歌单，可以关闭此面板继续浏览。'
+          : operation === 'enable' ? '显示设置已保存。' : '';
+      }
     } catch (error) {
       if (alive()) el('feedback').textContent = `未能完成操作：${(error as Error).message}`;
     } finally {

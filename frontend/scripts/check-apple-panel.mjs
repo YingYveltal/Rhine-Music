@@ -68,9 +68,11 @@ test('sync completion refreshes cards, and display toggle sends the selected boo
   assert.equal(env.calls.at(-1).operation, 'sync');
   env.calls.at(-1).resolve({ ...authorized, job: { ...base.job, running: true } }); await settle();
   assert.equal(env.refreshed, 1); assert.equal(env.nodes.get('#apple-sync').disabled, true);
+  assert.match(env.nodes.get('#apple-feedback').textContent, /正在同步歌单/);
   await env.tick();
   env.calls.at(-1).resolve({ ...authorized, playlistCount: 2, trackCount: 8, updatedAt: '2026-10-07T00:00:00Z' }); await settle();
   assert.equal(env.refreshed, 2); assert.equal(env.nodes.get('#apple-sync').disabled, false);
+  assert.equal(env.nodes.get('#apple-feedback').textContent, '');
   env.nodes.get('#apple-enabled').checked = false; env.nodes.get('#apple-enabled').onchange(); await settle();
   assert.equal(env.calls.at(-1).operation, 'enable'); assert.equal(env.calls.at(-1).body.enabled, false);
   env.calls.at(-1).resolve({ ...authorized, enabled: false }); await settle();
@@ -82,4 +84,25 @@ test('browser mount never invokes native APIs or claims a connection', () => {
   assert.equal(env.calls.length, 0); assert.equal(env.timers.size, 0);
   assert.match(env.nodes.get('#apple-status').textContent, /macOS 桌面应用/);
   env.dispose();
+});
+
+test('sync failure clears only its pending progress; a newer display action keeps its feedback', async () => {
+  for (const newerAction of [false, true]) {
+    const env = fixture(); const authorized = { ...base, authorization: 'authorized' };
+    const syncing = { ...authorized, job: { ...base.job, running: true } };
+    env.calls[0].resolve(authorized); await settle();
+    env.nodes.get('#apple-sync').onclick(); await settle();
+    env.calls.at(-1).resolve(syncing); await settle();
+    if (newerAction) {
+      env.nodes.get('#apple-enabled').checked = false;
+      env.nodes.get('#apple-enabled').onchange(); await settle();
+      env.calls.at(-1).resolve({ ...syncing, enabled: false }); await settle();
+      assert.equal(env.nodes.get('#apple-feedback').textContent, '显示设置已保存。');
+    }
+    await env.tick();
+    env.calls.at(-1).resolve({ ...authorized, enabled: !newerAction, job: { ...base.job, error: '网络不可用' } }); await settle();
+    assert.match(env.nodes.get('#apple-status').textContent, /同步未完成：网络不可用/);
+    assert.equal(env.nodes.get('#apple-feedback').textContent, newerAction ? '显示设置已保存。' : '');
+    env.dispose();
+  }
 });
