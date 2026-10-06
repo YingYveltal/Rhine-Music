@@ -16,4 +16,4 @@ python3 probes/apple-music/build.py
 
 接口依据：本机 `/System/Applications/Music.app/Contents/Resources/com.apple.Music.sdef`；Apple [SBApplication](https://developer.apple.com/documentation/scriptingbridge/sbapplication)、[自动化用途说明](https://developer.apple.com/documentation/bundleresources/information-property-list/nsappleeventsusagedescription)和 [Apple Events entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.automation.apple-events)。手写声明只覆盖实际读取及播放控制的公开字典方法，没有外部脚本执行或 UI 自动化代码。
 
-9b3839b 原型已在正常用户允许自动化后读到订阅曲目并推进播放，暂停/恢复/定位/停止通过。单曲播放不会自动建立共享歌单队列；新增加的歌单播放入口尚待本轮验证。实际出声仍须用户确认。完整结论以绑定包哈希的后续验收记录为准。
+4c5a3c4 原型已在正常授权后验证订阅曲目、原型自行建立歌单队列、前后切歌、定位及尾段自动续播。中间单曲点播会清空后续队列，是确定限制；实际出声仍须用户确认。版本/哈希、最小接入判断和未覆盖项见 [本轮报告](../../docs/APPLE-MUSIC-PROBE.md)。
