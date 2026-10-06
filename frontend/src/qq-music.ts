@@ -12,11 +12,10 @@ export function mountQqPanel(root: HTMLElement, refresh: () => Promise<void>, re
     <button id="qq-validate" class="text-button" hidden>重试验证连接 ↗</button>
     <label class="settings-row"><span>在专辑架显示 QQ 音乐</span><input id="qq-enabled" type="checkbox"></label>
     <div class="panel-actions"><button id="qq-remember">保存连接</button><button id="qq-logout">断开并忘记连接</button></div>
-    <p>保存后下次打开会恢复并验证连接。未保存的连接只在本次运行有效；关闭面板不会断开，但会取消尚未完成的扫码。</p>
     <form id="qq-search-form" class="qq-search"><input type="search" id="qq-query" aria-label="在线搜索 QQ 音乐" aria-describedby="qq-search-help" placeholder="在线搜索歌曲、歌手" required maxlength="150"><button>搜索 ↗</button></form>
     <p id="qq-search-help"></p>
     <button id="qq-daily" class="text-button" aria-describedby="qq-daily-help">打开每日推荐 ↗</button><p id="qq-daily-help"></p>
-    <details id="qq-advanced"><summary>高级设置</summary><p id="qq-key-status"></p><p>官方 API Key 用于官方搜索和每日推荐；它不能代替扫码登录，也不是同步个人曲库的前提。更换 Key 或重新登录后，如需下次恢复，请重新保存连接。</p>
+    <details id="qq-advanced"><summary>高级设置</summary><p id="qq-key-status"></p><p>扫码账户、官方服务配置和缓存曲库彼此独立。缓存不代表登录成功或拥有播放权限。保存连接使用本机钥匙串；重新登录或更换 Key 后需重新保存。关闭面板保留当前连接，但会取消尚未完成的扫码。</p>
     <form id="qq-key-form"><input id="qq-key" type="password" autocomplete="off" aria-label="QQ 音乐官方 API Key" placeholder="输入官方 API Key"><button class="text-button">验证并使用 Key ↗</button></form></details>
     <p id="qq-feedback" role="status" aria-live="polite"></p>`;
   let busy = false, disposed = false;
