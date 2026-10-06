@@ -87,6 +87,16 @@ f090853 已交同包独立复核。已发现停止收敛需小修：异步操作
 
 尚未覆盖：重复出现条目的通用定位、完整不定位曲尾、主观实际出声、已下载订阅内容、拒绝/撤销授权、系统媒体键、跨来源自动互斥、重启与分发身份、其他OS/账户。当前成功属于本机有界原型，不是 Rhine 功能验收。
 
+## 独立复核与停止定向修复
+
+总控在同一 f090853 可执行文件独立复核：真实25行歌单第10行起播超过15秒，暂停定位301秒后恢复，自动到第11行、entryID改变且进度超过5.93秒，无 skipRequest；随后停止固定11.5758秒至正常退出。不可变 `evidence/coordinator-f090853/`：events SHA `d3d03d398f3bc7852b523cbbd784dc0de9482d5f7a5db85369ef36feb1cca249`，report SHA `08b67c7e577eb8f7abe58627dc77cbf05a62f693a0002bd6b0475238bd83f10c`，manifest SHA 同 f090853。该复核没有覆盖主观出声或产品媒体键。
+
+最小修复源码 `30571401553693043b4a5e8c9b37d94fe450ae92`，干净构建，无编译警告且严格签名验证通过；exe SHA `8f846c60f923251618868c82a42b014926479cc3ad2f34eb8cd41b20f73c80cd`，Info.plist SHA不变。异步 Play/Resume/Next/Previous 完成的 settle 路径无条件补发最新 Stop/Pause，同时记录 completionIntent 的原生前态；不再以可能滞后的 paused 快照跳过最终命令。
+
+定向重测真实 Play→Stop 捕获 ticket1/latest2：18:12:23 UTC 过期完成时 SDK 仍 paused，立即补发 Stop；18:12:21–44 的25个补偿前观察均 paused / 0秒，无轮询 reassertStop。另一次 Next→Stop 的 Next 实际先完成：Stop瞬间原生态仍 playing / 0.086秒，Stop调用路径立即重申，下一秒为 paused 且位置固定至18:13:27，后续 timer 未再补偿。这没有捕获在途 Next，更不是无瞬态播放的通用保证。未重复已通过的全套正向歌单测试；修复仅改变终止意图收敛。
+
+`evidence/run-3057140/` 保存原累计日志2003–2154共152行，最后 quit；events SHA `ce039b3f795d7f8a9dc6b1331599141bb2d051f0c8b8e7dbe49666d7adc1319d`，report SHA `b3bb6afbad938ffef707186c2ba5b3187a4a75b0cae0894c97024db703a68083`，manifest SHA `04624e5e321dc277b4194690670409aa88e768558014f20e5fa80e64d4942246`。当前原型已退出，设备交回总控；最终文档提交不重建已测包。
+
 ## 推荐 Rhine 首版接入契约（提案，未实现）
 
 保留现有 Rust/Tauri 命令入口与 QQ/本地功能，通过小型 Swift MusicKit 模块的异步 C ABI 桥接到 Rust；MusicKit 在 MainActor 管理真实 Song/Track 对象，不阻塞主线程等待异步回调。前端只访问 Tauri。
