@@ -1,6 +1,31 @@
 import Foundation
 import MusicKit
 import CryptoKit
+import ImageIO
+
+// Validate downloaded/cached artwork before exposing it to all frontend views.
+@_cdecl("rhine_apple_artwork_valid")
+func rhineAppleArtworkValid(_ bytes: UnsafePointer<UInt8>, _ count: Int) -> UInt8 {
+    let data = Data(bytes: bytes, count: count)
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return 0 }
+    guard image.width > 0, image.height > 0, image.width <= 4096, image.height <= 4096 else { return 0 }
+    switch image.alphaInfo {
+    case .none, .noneSkipFirst, .noneSkipLast: return 1
+    default: break
+    }
+    // MusicKit can return a transparent image for an artwork-less playlist.
+    // Reject only zero-alpha images, not plain but opaque artwork.
+    var alpha = [UInt8](repeating: 0, count: image.width * image.height * 4)
+    let drawn = alpha.withUnsafeMutableBytes { pixels -> Bool in
+        guard let context = CGContext(data: pixels.baseAddress, width: image.width, height: image.height,
+            bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return true
+    }
+    return drawn && stride(from: 3, to: alpha.count, by: 4).contains(where: { alpha[$0] != 0 }) ? 1 : 0
+}
 
 private func failure(_ message: String) -> NSError {
     NSError(domain: "RhineApple", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
@@ -47,6 +72,16 @@ private func digest(_ fields: [String]) -> String {
         }
         return result
     }
+    func artwork(_ body: [String: Any]) async throws -> [String: Any] {
+        guard let raw = body["url"] as? String, let url = URL(string: raw),
+              url.scheme?.lowercased() == "musickit" else { throw failure("封面地址不可用") }
+        // MusicKit's local artwork URLs are supported by the shared native
+        // session, not a new ephemeral session or Rust's HTTP client.
+        let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 12))
+        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode),
+              !data.isEmpty, data.count < 10_000_000 else { throw failure("封面暂不可用") }
+        return ["data": data.base64EncodedString()]
+    }
     func sync() async throws -> [[String: Any]] {
         try checkAuthorization()
         guard !syncing else { throw failure("资料库正在同步") }
@@ -86,6 +121,13 @@ private func digest(_ fields: [String]) -> String {
                 "folder": "", "tracks": rows, "producers": [], "offline": false, "complete": true,
                 "loadError": NSNull(), "snapshotRevision": revision]
             if let url = playlist.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
+            // Only the original first entry's song artwork is eligible. Do not
+            // scan later tracks, substitute a music-video thumbnail, or search.
+            if let first = tracks.first, case .song(let song) = first {
+                if let url = song.artwork?.url(width: 600, height: 600) {
+                    album["firstTrackArtworkURL"] = url.absoluteString
+                }
+            }
             nextAlbums.append(album); completed += 1
         }
         // Publish only a complete snapshot. An active queue keeps its own objects.
@@ -207,6 +249,7 @@ private func digest(_ fields: [String]) -> String {
             if MusicAuthorization.currentStatus == .notDetermined { _ = await MusicAuthorization.request() }
             return ["authorization": authorization()]
         case "sync": return try await sync()
+        case "artwork": return try await artwork(body)
         case "state": return playback()
         default: try await control(op, body); return playback()
         }
