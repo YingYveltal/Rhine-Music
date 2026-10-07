@@ -94,6 +94,21 @@ private func digest(_ fields: [String]) -> String {
         artworkTrace("first-album request-failed")
         return nil
     }
+    func probeArtworkURL(_ artwork: Artwork?) async {
+        guard let url = artwork?.url(width: 600, height: 600) else { return }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = 12
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        do {
+            let (data, response) = try await session.data(from: url)
+            artworkTrace("native-session bytes=\(data.count) http=\((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        } catch {
+            let e = error as NSError
+            artworkTrace("native-session error-domain=\(e.domain) code=\(e.code)")
+        }
+    }
     func sync() async throws -> [[String: Any]] {
         try checkAuthorization()
         guard !syncing else { throw failure("资料库正在同步") }
@@ -133,10 +148,12 @@ private func digest(_ fields: [String]) -> String {
                 "folder": "", "tracks": rows, "producers": [], "offline": false, "complete": true,
                 "loadError": NSNull(), "snapshotRevision": revision]
             traceArtwork("playlist", playlist.artwork)
+            await probeArtworkURL(playlist.artwork)
             if let url = playlist.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
             // Only the original first entry's song artwork is eligible. Do not
             // scan later tracks, substitute a music-video thumbnail, or search.
             if let first = tracks.first, case .song(let song) = first {
+                await probeArtworkURL(song.artwork)
                 if let url = await firstSongArtworkURL(song) {
                     album["firstTrackArtworkURL"] = url.absoluteString
                 }
