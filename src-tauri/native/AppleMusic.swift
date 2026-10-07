@@ -108,6 +108,14 @@ private func digest(_ fields: [String]) -> String {
             let e = error as NSError
             artworkTrace("native-session error-domain=\(e.domain) code=\(e.code)")
         }
+        do {
+            let fresh = artwork!.url(width: 600, height: 600)!
+            let (data, response) = try await URLSession.shared.data(for: URLRequest(url: fresh, timeoutInterval: 12))
+            artworkTrace("native-shared bytes=\(data.count) http=\((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        } catch {
+            let e = error as NSError
+            artworkTrace("native-shared error-domain=\(e.domain) code=\(e.code)")
+        }
     }
     func sync() async throws -> [[String: Any]] {
         try checkAuthorization()
