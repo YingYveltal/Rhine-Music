@@ -1,3 +1,4 @@
+import { syncWindowTheme } from "./window-theme";
 import { isApplePlaylist, appleCollectionLabel, appleDiscSummary, appleTrackNumber, appleDiscHeading } from "./apple-collection";
 import "@kitlangton/rolling-number/styles.css";
 import "./style.css";
@@ -193,6 +194,7 @@ const stage = $("#stage");
 stage.className = "music-app";
 stage.dataset.mode = "archive";
 stage.dataset.theme = preferences.theme;
+syncWindowTheme(preferences.theme);
 stage.innerHTML = `
   <div id="three-scene" class="three-scene"></div>
   <div class="music-vignette" aria-hidden="true"></div>
@@ -438,6 +440,7 @@ function setTheme(theme: Theme) {
   if (theme === preferences.theme) return;
   preferences.theme = theme;
   stage.dataset.theme = theme;
+  syncWindowTheme(theme);
   scene?.setTheme(theme, !preferences.reduced);
   viewer?.setTheme(theme);
   document

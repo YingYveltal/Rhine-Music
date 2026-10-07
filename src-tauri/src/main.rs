@@ -1,3 +1,4 @@
+mod window_theme;
 #[cfg(feature = "preview")]
 mod preview;
 mod audio;
@@ -607,6 +608,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            window_theme::set_window_theme,
             music_request,
             player_command,
             player_state,
