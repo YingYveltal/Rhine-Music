@@ -1,6 +1,10 @@
 import type { ArchiveScene } from "./scene";
 import { isNative, nativeInvoke } from "./native";
 type Sample = {
+  // RAF timestamp relative to the run; work belongs to this callback, whereas
+  // interval spans the preceding callback. Do not correlate them as one GPU frame.
+  atMs: number;
+  work?: ArchiveScene['frameWork'];
   interval: number;
   cpu: number;
   calls: number;
@@ -22,6 +26,10 @@ type Input = {
 let active:
   | {
       label: string;
+      scene?: ArchiveScene;
+      startingCounters?: ReturnType<ArchiveScene['measurementCounters']>;
+      documentLayouts: { atMs: number; cpuMs: number; phase: string; batched: boolean; geometry?: string[] }[];
+      libraryRefreshes: { atMs: number; comparisonCpuMs: number; changed: boolean; albums: number }[];
       start: number;
       until: number;
       previous: number;
@@ -59,6 +67,10 @@ export function beginMeasurement(
   const now = performance.now();
   active = {
     label,
+    scene,
+    startingCounters: scene?.measurementCounters(),
+    libraryRefreshes: [],
+    documentLayouts: [],
     start: now,
     until: now + seconds * 1000,
     previous: 0,
@@ -73,8 +85,16 @@ export function beginMeasurement(
     nativeFrames: [],
     maxPending: 0,
   };
+  if (scene) scene.measureFrame = true;
   document.documentElement.dataset.measurement = label;
   return true;
+}
+export function measurementActive() { return active !== undefined; }
+export function recordDocumentLayout(cpuMs: number, phase: string, batched: boolean, geometry?: string[]) {
+  if (active) active.documentLayouts.push({ atMs: performance.now() - active.start, cpuMs, phase, batched, geometry });
+}
+export function recordLibraryRefresh(comparisonCpuMs: number, changed: boolean, albums: number) {
+  if (active) active.libraryRefreshes.push({ atMs: performance.now() - active.start, comparisonCpuMs, changed, albums });
 }
 export function recordNativeCompletion(issuedAt:number,completedAt:number,gpuMs:number,cpuMs:number) {
   if(!active)return;
@@ -129,6 +149,8 @@ export function sampleFrame(
   }
   if (active.previous)
     active.samples.push({
+      atMs: now - active.start,
+      work: scene.frameWork?.frameTime === now / 1000 ? scene.frameWork : undefined,
       interval: now - active.previous,
       cpu,
       calls: scene.renderer.info.render.calls,
@@ -157,6 +179,7 @@ export function sampleFrame(
   if (now < active.until) return;
   const m = active;
   active = undefined;
+  if (m.scene) m.scene.measureFrame = false;
   const intervals = m.samples.map((s) => s.interval),
     cpus = m.samples.map((s) => s.cpu);
   const total = intervals.reduce((a, b) => a + b, 0);
@@ -208,6 +231,10 @@ export function sampleFrame(
       0.5,
     ),
     gpuMs: null,
+    startingCounters: m.startingCounters,
+    libraryRefreshes: m.libraryRefreshes,
+    documentLayouts: m.documentLayouts,
+    workTimingNote: "Opt-in CPU wall-clock phases, without GPU barriers: update includes instance capture; atlasUpload measures atlas submission only, while selected-cover uploads can occur inside renderSubmission. resolution includes policy/resize. Work belongs to atMs; RAF interval ends at that callback. Neither is GPU execution or presentation. Cover counters are cumulative and exclude GPU upload byte accounting for full-size selected covers.",
     sceneStats: scene.getStats(),
     nativeMetal: {...scene.nativeMetal.stats,frames:m.nativeFrames,
       completedFps:m.nativeFrames.length>1 ? 1000*(m.nativeFrames.length-1)/(m.nativeFrames.at(-1)!.completedAt-m.nativeFrames[0].completedAt):null,

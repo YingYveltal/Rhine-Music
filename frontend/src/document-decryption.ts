@@ -8,6 +8,8 @@ export class DocumentDecryption {
     private selector = "h2, .detail-title-cn, .metadata dd, .tab-panel p, .research-notes li, .log-row",
     private holdSeconds?: number,
   ) {}
+  // Kept off until same-picture/runtime checks pass; QA can compare one variable.
+  batchLayout = false;
   private root: HTMLElement | null = null;
   private covers: Cover[] = [];
   private started: number | null = null;
@@ -29,8 +31,13 @@ export class DocumentDecryption {
     // Measure text fragments, including wrapped lines, without splitting or
     // replacing the actual text. Stage scaling cancels out in local coordinates.
     const targets = this.root.querySelectorAll<HTMLElement>(this.selector);
+    // A class or overlay write invalidates layout. Complete all positioning
+    // writes before reading any fragments, then attach overlays after all reads.
+    // The legacy branch is retained for a same-build, single-variable comparison.
+    const pending: { target: HTMLElement; window: HTMLElement }[] = [];
+    if (this.batchLayout) targets.forEach(target => target.classList.add("document-redacted"));
     targets.forEach((target) => {
-      target.classList.add("document-redacted");
+      if (!this.batchLayout) target.classList.add("document-redacted");
       const bounds = target.getBoundingClientRect();
       const scale = bounds.width / target.offsetWidth;
       if (!scale || !Number.isFinite(scale)) return;
@@ -67,10 +74,12 @@ export class DocumentDecryption {
         const ink = document.createElement("span");
         ink.className = "document-redaction-ink";
         window.append(ink);
-        target.append(window);
+        if (this.batchLayout) pending.push({ target, window });
+        else target.append(window);
         this.covers.push({ window, ink, order: this.covers.length });
       }
     });
+    for (const { target, window } of pending) target.append(window);
     this.paint();
   }
 
@@ -101,6 +110,9 @@ export class DocumentDecryption {
     if (this.progress === 1) this.remove();
     else if (this.started !== null) this.paint();
   }
+
+  /** Local line boxes only, with no text, for same-layout diagnostic comparison. */
+  layoutGeometry() { return this.covers.map(cover => cover.window.style.cssText); }
 
   private paint() {
     const count = Math.max(1, this.covers.length - 1);

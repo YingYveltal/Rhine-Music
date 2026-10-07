@@ -1,0 +1,610 @@
+{
+  "baselineSource": "d38122dbd54dd816b0bf2ef11bd3b98a6956d27d",
+  "measuredPackageSource": "a546c351c727a4077e12a0813a81aaf376d0ec0f",
+  "executableSha256": "c4dd06a15aef49e8000fcf5472e72fe41420807ca6f57c3fc300d20c16f70c27",
+  "frontendMatchesBaseline": true,
+  "candidateMeasured": "existing transmissionDepthEnabled flag, not the new document-layout candidate",
+  "rawEvidence": "ignored .local/issue33-evidence/current-preview; original reports contain private library identifiers and are not committed",
+  "restored": {
+    "smoothMotion": true,
+    "transmissionDepth": false,
+    "postFusion": false,
+    "metal": false,
+    "theme": "night",
+    "initialAlbumAndArchive": true,
+    "playbackIdle": true
+  },
+  "reports": [
+    {
+      "label": "optimized-archive-night",
+      "valid": true,
+      "measuredAt": "2026-10-06T18:35:01.794Z",
+      "viewport": [
+        1280,
+        788
+      ],
+      "startingDevicePixelRatio": 2,
+      "canvas": [
+        1920,
+        1182
+      ],
+      "smoothMotion": {
+        "enabled": true,
+        "endingScale": 1,
+        "sampledResolutions": [
+          "1920x1182"
+        ]
+      },
+      "fps": 27.54628474474774,
+      "frameMs": {
+        "max": 62,
+        "p50": 35,
+        "p95": 44,
+        "p99": 46
+      },
+      "cpuSubmissionMs": {
+        "max": 4,
+        "p50": 1,
+        "p95": 2,
+        "p99": 3
+      },
+      "framesOver50Ms": 3,
+      "samples": 552,
+      "postFusionEnabled": false,
+      "transmissionDepthEnabled": false,
+      "file": "20261006-183501-optimized-archive-night.json",
+      "sha256": "abdf18b322553bc3f2fee1204814093d55264a145db74f9778eb8528601cdbd4",
+      "bytes": 82932,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      }
+    },
+    {
+      "label": "optimized-stress-night",
+      "valid": true,
+      "measuredAt": "2026-10-06T18:35:51.598Z",
+      "viewport": [
+        1280,
+        788
+      ],
+      "startingDevicePixelRatio": 2,
+      "canvas": [
+        1920,
+        1182
+      ],
+      "smoothMotion": {
+        "enabled": true,
+        "endingScale": 1,
+        "sampledResolutions": [
+          "1920x1182",
+          "1279x787"
+        ]
+      },
+      "fps": 38.39697110404686,
+      "frameMs": {
+        "max": 96,
+        "p50": 25,
+        "p95": 40,
+        "p99": 61
+      },
+      "cpuSubmissionMs": {
+        "max": 69,
+        "p50": 2.00000000023283,
+        "p95": 5,
+        "p99": 9
+      },
+      "framesOver50Ms": 15,
+      "samples": 1075,
+      "postFusionEnabled": false,
+      "transmissionDepthEnabled": false,
+      "file": "20261006-183551-optimized-stress-night.json",
+      "sha256": "b7607725c3ca8a79533ffbd003389d1bc2c0bea34820a2e6da7e9b4074772d7e",
+      "bytes": 223350,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "interaction": {
+        "count": 111,
+        "handlerMs": {
+          "max": 14,
+          "p50": 1,
+          "p95": 3,
+          "p99": 4
+        },
+        "nextSubmissionMs": {
+          "max": 49,
+          "p50": 17,
+          "p95": 40,
+          "p99": 48
+        },
+        "timerDelayMs": {
+          "max": 7,
+          "p50": 0,
+          "p95": 5,
+          "p99": 6
+        },
+        "maxPendingSelection": 1
+      },
+      "expectedFinalMatched": true,
+      "largestCpuSpike": {
+        "cpuMs": 69,
+        "approxIntervalSumMs": 22953,
+        "resized": false
+      }
+    },
+    {
+      "label": "pass-profile",
+      "canvas": [
+        1920,
+        1182
+      ],
+      "file": "20261006-183634-pass-profile.json",
+      "sha256": "bf714b2fefa1416e62bb2831fa5f18a9bdd6155558a0fa3f82e0e720b4af9cfc",
+      "bytes": 2133,
+      "timings": [
+        {
+          "name": "PBR/transmission/shadows",
+          "samplesMs": [
+            31,
+            18,
+            32,
+            26.99999999976717,
+            28
+          ]
+        },
+        {
+          "name": "SSAO normals + 32 samples + blur",
+          "samplesMs": [
+            2.99999999976717,
+            6,
+            4,
+            4,
+            5
+          ]
+        },
+        {
+          "name": "Bokeh depth + 41-tap DOF",
+          "samplesMs": [
+            15,
+            3,
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "name": "SMAA",
+          "samplesMs": []
+        },
+        {
+          "name": "Output",
+          "samplesMs": [
+            0.9999999997671694,
+            1,
+            2,
+            1,
+            1
+          ]
+        }
+      ],
+      "note": "Diagnostic readback wall-clock timings include GPU completion and WebGL IPC barriers. They perturb pipelining and are not normal frame or pure GPU timings.",
+      "gpuTimerExtensionAvailable": false
+    },
+    {
+      "label": "optimized-stress-night",
+      "valid": true,
+      "measuredAt": "2026-10-06T18:37:54.409Z",
+      "viewport": [
+        1280,
+        788
+      ],
+      "startingDevicePixelRatio": 2,
+      "canvas": [
+        1920,
+        1182
+      ],
+      "smoothMotion": {
+        "enabled": false,
+        "endingScale": 1,
+        "sampledResolutions": [
+          "1920x1182"
+        ]
+      },
+      "fps": 33.48461565950756,
+      "frameMs": {
+        "max": 76,
+        "p50": 29,
+        "p95": 39,
+        "p99": 43
+      },
+      "cpuSubmissionMs": {
+        "max": 50,
+        "p50": 3,
+        "p95": 5,
+        "p99": 9
+      },
+      "framesOver50Ms": 3,
+      "samples": 937,
+      "postFusionEnabled": false,
+      "transmissionDepthEnabled": false,
+      "file": "20261006-183754-optimized-stress-night.json",
+      "sha256": "d72052040b9ddf3b7b32655409bee795fbbd9ea8035dc43c1545b457f9d977ff",
+      "bytes": 207698,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "interaction": {
+        "count": 111,
+        "handlerMs": {
+          "max": 7,
+          "p50": 1,
+          "p95": 2.00000000023283,
+          "p99": 5
+        },
+        "nextSubmissionMs": {
+          "max": 32,
+          "p50": 20,
+          "p95": 30,
+          "p99": 32
+        },
+        "timerDelayMs": {
+          "max": 20,
+          "p50": 1,
+          "p95": 7,
+          "p99": 8
+        },
+        "maxPendingSelection": 1
+      },
+      "expectedFinalMatched": true,
+      "largestCpuSpike": {
+        "cpuMs": 50,
+        "approxIntervalSumMs": 22907,
+        "resized": false
+      }
+    },
+    {
+      "label": "optimized-stress-night",
+      "valid": true,
+      "measuredAt": "2026-10-06T18:39:14.336Z",
+      "viewport": [
+        1280,
+        788
+      ],
+      "startingDevicePixelRatio": 2,
+      "canvas": [
+        1920,
+        1182
+      ],
+      "smoothMotion": {
+        "enabled": false,
+        "endingScale": 1,
+        "sampledResolutions": [
+          "1920x1182"
+        ]
+      },
+      "fps": 32.34905559324454,
+      "frameMs": {
+        "max": 80,
+        "p50": 30,
+        "p95": 42,
+        "p99": 52
+      },
+      "cpuSubmissionMs": {
+        "max": 44.00000000023283,
+        "p50": 3,
+        "p95": 5.000000000232831,
+        "p99": 8
+      },
+      "framesOver50Ms": 10,
+      "samples": 906,
+      "postFusionEnabled": false,
+      "transmissionDepthEnabled": false,
+      "file": "20261006-183914-optimized-stress-night.json",
+      "sha256": "9fcee06500964ffc0bcffd6c72ab0b2b363f6ed07fcfdab9874a7fe1d04efbc2",
+      "bytes": 203392,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "interaction": {
+        "count": 111,
+        "handlerMs": {
+          "max": 7,
+          "p50": 1,
+          "p95": 3.00000000023283,
+          "p99": 5
+        },
+        "nextSubmissionMs": {
+          "max": 39,
+          "p50": 20,
+          "p95": 31,
+          "p99": 36
+        },
+        "timerDelayMs": {
+          "max": 14.00000000023283,
+          "p50": 1,
+          "p95": 8,
+          "p99": 13
+        },
+        "maxPendingSelection": 1
+      },
+      "expectedFinalMatched": true,
+      "largestCpuSpike": {
+        "cpuMs": 44.00000000023283,
+        "approxIntervalSumMs": 22923,
+        "resized": false
+      }
+    },
+    {
+      "label": "optimized-stress-night",
+      "valid": true,
+      "measuredAt": "2026-10-06T18:40:28.543Z",
+      "viewport": [
+        1280,
+        788
+      ],
+      "startingDevicePixelRatio": 2,
+      "canvas": [
+        1920,
+        1182
+      ],
+      "smoothMotion": {
+        "enabled": false,
+        "endingScale": 1,
+        "sampledResolutions": [
+          "1920x1182"
+        ]
+      },
+      "fps": 32.61413159962849,
+      "frameMs": {
+        "max": 71,
+        "p50": 30,
+        "p95": 41,
+        "p99": 54
+      },
+      "cpuSubmissionMs": {
+        "max": 35,
+        "p50": 2.99999999976717,
+        "p95": 5,
+        "p99": 7
+      },
+      "framesOver50Ms": 10,
+      "samples": 913,
+      "postFusionEnabled": false,
+      "transmissionDepthEnabled": true,
+      "file": "20261006-184028-optimized-stress-night.json",
+      "sha256": "a2ef18e4f741e6750d06b391c233985a13c078b5ad763b42e65ca698d353de02",
+      "bytes": 203534,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "interaction": {
+        "count": 111,
+        "handlerMs": {
+          "max": 10,
+          "p50": 1,
+          "p95": 2.00000000023283,
+          "p99": 7
+        },
+        "nextSubmissionMs": {
+          "max": 44,
+          "p50": 21,
+          "p95": 31,
+          "p99": 33
+        },
+        "timerDelayMs": {
+          "max": 9,
+          "p50": 0,
+          "p95": 6,
+          "p99": 8
+        },
+        "maxPendingSelection": 1
+      },
+      "expectedFinalMatched": true,
+      "largestCpuSpike": {
+        "cpuMs": 35,
+        "approxIntervalSumMs": 22947,
+        "resized": false
+      }
+    },
+    {
+      "label": "optimized-stress-night",
+      "valid": true,
+      "measuredAt": "2026-10-06T18:41:51.636Z",
+      "viewport": [
+        1280,
+        788
+      ],
+      "startingDevicePixelRatio": 2,
+      "canvas": [
+        1920,
+        1182
+      ],
+      "smoothMotion": {
+        "enabled": false,
+        "endingScale": 1,
+        "sampledResolutions": [
+          "1920x1182"
+        ]
+      },
+      "fps": 31.466533323808843,
+      "frameMs": {
+        "max": 70,
+        "p50": 31,
+        "p95": 41,
+        "p99": 49
+      },
+      "cpuSubmissionMs": {
+        "max": 22,
+        "p50": 3,
+        "p95": 5.000000000232831,
+        "p99": 7.999999999767169
+      },
+      "framesOver50Ms": 5,
+      "samples": 881,
+      "postFusionEnabled": false,
+      "transmissionDepthEnabled": false,
+      "file": "20261006-184151-optimized-stress-night.json",
+      "sha256": "34a53c0dc9a9c42504dda3423e5527231e1abba64514be505b8ae07e0e47081a",
+      "bytes": 203144,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "interaction": {
+        "count": 111,
+        "handlerMs": {
+          "max": 11,
+          "p50": 0.9999999997671694,
+          "p95": 4,
+          "p99": 9
+        },
+        "nextSubmissionMs": {
+          "max": 47,
+          "p50": 21.00000000023283,
+          "p95": 32.99999999976717,
+          "p99": 35
+        },
+        "timerDelayMs": {
+          "max": 11,
+          "p50": 0,
+          "p95": 6,
+          "p99": 9
+        },
+        "maxPendingSelection": 1
+      },
+      "expectedFinalMatched": true,
+      "largestCpuSpike": {
+        "cpuMs": 22,
+        "approxIntervalSumMs": 22884,
+        "resized": false
+      }
+    },
+    {
+      "label": "optimized-stress-night",
+      "valid": true,
+      "measuredAt": "2026-10-06T18:43:01.566Z",
+      "viewport": [
+        1280,
+        788
+      ],
+      "startingDevicePixelRatio": 2,
+      "canvas": [
+        1920,
+        1182
+      ],
+      "smoothMotion": {
+        "enabled": false,
+        "endingScale": 1,
+        "sampledResolutions": [
+          "1920x1182"
+        ]
+      },
+      "fps": 32.16123499142367,
+      "frameMs": {
+        "max": 74,
+        "p50": 31,
+        "p95": 41,
+        "p99": 49
+      },
+      "cpuSubmissionMs": {
+        "max": 50,
+        "p50": 3,
+        "p95": 6,
+        "p99": 8
+      },
+      "framesOver50Ms": 8,
+      "samples": 900,
+      "postFusionEnabled": false,
+      "transmissionDepthEnabled": true,
+      "file": "20261006-184301-optimized-stress-night.json",
+      "sha256": "49c48cb69ab245d758811e84f462530f935353327d2dde54fbd716b267aa83f4",
+      "bytes": 200019,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "interaction": {
+        "count": 111,
+        "handlerMs": {
+          "max": 10,
+          "p50": 1,
+          "p95": 2,
+          "p99": 9
+        },
+        "nextSubmissionMs": {
+          "max": 36,
+          "p50": 19,
+          "p95": 31,
+          "p99": 33
+        },
+        "timerDelayMs": {
+          "max": 23,
+          "p50": 1,
+          "p95": 7,
+          "p99": 9
+        },
+        "maxPendingSelection": 1
+      },
+      "expectedFinalMatched": true,
+      "largestCpuSpike": {
+        "cpuMs": 50,
+        "approxIntervalSumMs": 22917,
+        "resized": false
+      }
+    }
+  ]
+}

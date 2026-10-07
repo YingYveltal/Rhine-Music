@@ -87,6 +87,14 @@ export class ArchiveScene {
   renderingOptimized = true;
   readonly motionResolution = new MotionResolution();
   private fullResolutionPixels = 0;
+  // Opt-in CPU wall-clock diagnostics. Never interpreted as GPU timings.
+  measureFrame = false;
+  frameWork?: {
+    frameTime: number; updateMs: number; atlasUploadMs: number;
+    resolutionMs: number; renderSubmissionMs: number; resized: boolean;
+    outgoing: number; coverCache: ReturnType<ArchiveScene['measurementCounters']>['coverCache'];
+  };
+  measurementCounters() { return { outgoing: this.outgoing.length, coverCache: this.covers?.cacheStats }; }
   // Kept as developer experiments: matched Retina playback did not establish
   // an end-to-end speedup, even though Metal's isolated fused pass is faster.
   postFusionEnabled = false;
@@ -1133,6 +1141,8 @@ export class ArchiveScene {
     time: number,
     cinematic?: { reveal: number; lift: number; zoom: number; time: number; musicIntro?: boolean },
   ) {
+    const workStart = this.measureFrame ? performance.now() : 0;
+    this.frameWork = undefined;
     const dt = motionDelta(time - this.last);
     this.last = time;
     this.clock = time;
@@ -1751,12 +1761,24 @@ export class ArchiveScene {
     if (musicLibrary && this.renderer.shadowMap.enabled)
       this.renderer.shadowMap.needsUpdate = true;
     this.instanceVisibility.capture([...this.instances,...(this.covers?[this.covers.array]:[])]);
+    const uploadStart = this.measureFrame ? performance.now() : 0;
     this.covers?.flushUploads(this.renderer);
+    const resolutionStart = this.measureFrame ? performance.now() : 0;
     const oldScale=this.motionResolution.scale;
     this.motionResolution.update(time,this.interactionPose().concat(this.rotation),
       !this.reduced && !this.nativeMetal.preparing && !this.nativeMetal.stats.active,this.fullResolutionPixels,idle);
     if (this.motionResolution.scale!==oldScale) this.resize();
+    const renderStart = this.measureFrame ? performance.now() : 0;
     this.renderCurrentFrame();
+    if (this.measureFrame) this.frameWork = {
+      frameTime: time,
+      updateMs: uploadStart - workStart,
+      atlasUploadMs: resolutionStart - uploadStart,
+      resolutionMs: renderStart - resolutionStart,
+      renderSubmissionMs: performance.now() - renderStart,
+      resized: this.motionResolution.scale !== oldScale,
+      ...this.measurementCounters(),
+    };
     if (this.pendingHover) {
       this.pendingHover = false;
       if (this.reveal >= 0.8 && this.detail <= 0.2 && records.length) {

@@ -1,0 +1,545 @@
+{
+  "sourceCommit": "6f998b0201d22f0bcadc7b857ca11d8bab55c691",
+  "executableSha256": "6a9bef97c22a3311ee7953e0707d7086866989f1b5fadc4943cfa8484b242c29",
+  "conditions": {
+    "devicePixelRatio": 1,
+    "viewport": [
+      1280,
+      788
+    ],
+    "buffer": [
+      1280,
+      788
+    ],
+    "theme": "night",
+    "smoothMotion": false,
+    "albums": 26,
+    "tracks": 597,
+    "powerBefore": "AC",
+    "thermalState": "not recorded",
+    "comparisonToPreviousDpr2": "not valid as speedup evidence"
+  },
+  "runs": [
+    {
+      "tag": "warmup",
+      "file": "20261007-074833-optimized-stress-night.json",
+      "sha256": "d4b6b749cc187b2eb31705a615a778214183560c3d759af652aaff9ce3609b0c",
+      "bytes": 952549,
+      "batched": false,
+      "valid": true,
+      "interruptions": [],
+      "canvas": [
+        1280,
+        788
+      ],
+      "dpr": 1,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "sampledResolutions": [
+        "1280x788"
+      ],
+      "fps": 49.64994999285612,
+      "frameMs": {
+        "max": 98,
+        "p50": 18,
+        "p95": 33,
+        "p99": 40
+      },
+      "cpuSubmissionMs": {
+        "max": 80,
+        "p50": 2.999999999970896,
+        "p95": 5,
+        "p99": 7
+      },
+      "framesOver50Ms": 3,
+      "samples": 1390,
+      "inputCount": 111,
+      "inputNextSubmissionMs": {
+        "max": 44,
+        "p50": 16,
+        "p95": 29,
+        "p99": 33.000000000029104
+      },
+      "finalPhase": "detail",
+      "finalPending": false,
+      "finalAlbumMatches": true,
+      "documentLayoutMs": 3,
+      "geometryCount": 23,
+      "geometryEqualToWarmup": true,
+      "geometrySha256": "7b34bfabbfe6c134254c634a93b26a7948f1359e0c02d9662c5cf6a4711eccac",
+      "menuFrame": {
+        "atMs": 22956.99999999997,
+        "cpuMs": 80,
+        "nextRafIntervalMs": 98,
+        "sceneWork": {
+          "atlasUploadMs": 0,
+          "coverCache": {
+            "bytes": 119275520,
+            "logicalSlots": 432,
+            "printHits": 91,
+            "printMisses": 12,
+            "printedCovers": 11,
+            "tiles": 23,
+            "uniqueTiles": 26
+          },
+          "frameTime": 160.746,
+          "outgoing": 0,
+          "renderSubmissionMs": 1,
+          "resized": false,
+          "resolutionMs": 0,
+          "updateMs": 1
+        }
+      },
+      "libraryComparisonMaxMs": 1,
+      "libraryChanged": false
+    },
+    {
+      "tag": "A1",
+      "file": "20261007-075006-optimized-stress-night.json",
+      "sha256": "a5a8b2ba249d016535d79a1dc4c164163902c3b29ee1494384b913d8f56bc05d",
+      "bytes": 939372,
+      "batched": false,
+      "valid": true,
+      "interruptions": [],
+      "canvas": [
+        1280,
+        788
+      ],
+      "dpr": 1,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "sampledResolutions": [
+        "1280x788"
+      ],
+      "fps": 49.14636759768555,
+      "frameMs": {
+        "max": 49,
+        "p50": 18,
+        "p95": 33,
+        "p99": 39
+      },
+      "cpuSubmissionMs": {
+        "max": 10.999999999970896,
+        "p50": 2.000000000029104,
+        "p95": 5,
+        "p99": 6
+      },
+      "framesOver50Ms": 0,
+      "samples": 1376,
+      "inputCount": 111,
+      "inputNextSubmissionMs": {
+        "max": 31,
+        "p50": 13,
+        "p95": 27,
+        "p99": 28.000000000029104
+      },
+      "finalPhase": "detail",
+      "finalPending": false,
+      "finalAlbumMatches": true,
+      "documentLayoutMs": 2,
+      "geometryCount": 23,
+      "geometryEqualToWarmup": true,
+      "geometrySha256": "7b34bfabbfe6c134254c634a93b26a7948f1359e0c02d9662c5cf6a4711eccac",
+      "menuFrame": {
+        "atMs": 22919,
+        "cpuMs": 10,
+        "nextRafIntervalMs": 30,
+        "sceneWork": {
+          "atlasUploadMs": 0,
+          "coverCache": {
+            "bytes": 119275520,
+            "logicalSlots": 432,
+            "printHits": 192,
+            "printMisses": 12,
+            "printedCovers": 11,
+            "tiles": 23,
+            "uniqueTiles": 26
+          },
+          "frameTime": 253.078,
+          "outgoing": 0,
+          "renderSubmissionMs": 0,
+          "resized": false,
+          "resolutionMs": 0,
+          "updateMs": 1
+        }
+      },
+      "libraryComparisonMaxMs": 1,
+      "libraryChanged": false
+    },
+    {
+      "tag": "A2",
+      "file": "20261007-075110-optimized-stress-night.json",
+      "sha256": "5fa5b7162528052bb53bc5b5271b96f6693c5f475f2d7342a0c075a0aea92945",
+      "bytes": 935449,
+      "batched": false,
+      "valid": true,
+      "interruptions": [],
+      "canvas": [
+        1280,
+        788
+      ],
+      "dpr": 1,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "sampledResolutions": [
+        "1280x788"
+      ],
+      "fps": 49.5,
+      "frameMs": {
+        "max": 49,
+        "p50": 19,
+        "p95": 32,
+        "p99": 39
+      },
+      "cpuSubmissionMs": {
+        "max": 14,
+        "p50": 2.0000000000582077,
+        "p95": 5,
+        "p99": 6
+      },
+      "framesOver50Ms": 0,
+      "samples": 1386,
+      "inputCount": 111,
+      "inputNextSubmissionMs": {
+        "max": 30,
+        "p50": 15,
+        "p95": 27,
+        "p99": 28
+      },
+      "finalPhase": "detail",
+      "finalPending": false,
+      "finalAlbumMatches": true,
+      "documentLayoutMs": 1.9999999999417923,
+      "geometryCount": 23,
+      "geometryEqualToWarmup": true,
+      "geometrySha256": "7b34bfabbfe6c134254c634a93b26a7948f1359e0c02d9662c5cf6a4711eccac",
+      "menuFrame": {
+        "atMs": 22946,
+        "cpuMs": 14,
+        "nextRafIntervalMs": 29,
+        "sceneWork": {
+          "atlasUploadMs": 0,
+          "coverCache": {
+            "bytes": 119275520,
+            "logicalSlots": 432,
+            "printHits": 293,
+            "printMisses": 12,
+            "printedCovers": 11,
+            "tiles": 23,
+            "uniqueTiles": 26
+          },
+          "frameTime": 317.103,
+          "outgoing": 0,
+          "renderSubmissionMs": 2,
+          "resized": false,
+          "resolutionMs": 0,
+          "updateMs": 1
+        }
+      },
+      "libraryComparisonMaxMs": 1,
+      "libraryChanged": false
+    },
+    {
+      "tag": "B1",
+      "file": "20261007-075216-optimized-stress-night.json",
+      "sha256": "73395ae22126485dddbdae2e8494057f8111351568008084ebfe509387ace27f",
+      "bytes": 978397,
+      "batched": true,
+      "valid": true,
+      "interruptions": [],
+      "canvas": [
+        1280,
+        788
+      ],
+      "dpr": 1,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "sampledResolutions": [
+        "1280x788"
+      ],
+      "fps": 50.58046079657082,
+      "frameMs": {
+        "max": 45,
+        "p50": 18,
+        "p95": 30,
+        "p99": 35
+      },
+      "cpuSubmissionMs": {
+        "max": 9.999999999941792,
+        "p50": 2.0000000000582077,
+        "p95": 5,
+        "p99": 5.000000000058208
+      },
+      "framesOver50Ms": 0,
+      "samples": 1416,
+      "inputCount": 111,
+      "inputNextSubmissionMs": {
+        "max": 28.999999999941792,
+        "p50": 13,
+        "p95": 24,
+        "p99": 28
+      },
+      "finalPhase": "detail",
+      "finalPending": false,
+      "finalAlbumMatches": true,
+      "documentLayoutMs": 1,
+      "geometryCount": 23,
+      "geometryEqualToWarmup": true,
+      "geometrySha256": "7b34bfabbfe6c134254c634a93b26a7948f1359e0c02d9662c5cf6a4711eccac",
+      "menuFrame": {
+        "atMs": 22958.99999999994,
+        "cpuMs": 9.999999999941792,
+        "nextRafIntervalMs": 26,
+        "sceneWork": {
+          "atlasUploadMs": 0,
+          "coverCache": {
+            "bytes": 119275520,
+            "logicalSlots": 432,
+            "printHits": 394,
+            "printMisses": 12,
+            "printedCovers": 11,
+            "tiles": 23,
+            "uniqueTiles": 26
+          },
+          "frameTime": 383.376,
+          "outgoing": 0,
+          "renderSubmissionMs": 1,
+          "resized": false,
+          "resolutionMs": 0,
+          "updateMs": 0.9999999999417925
+        }
+      },
+      "libraryComparisonMaxMs": 1,
+      "libraryChanged": false
+    },
+    {
+      "tag": "A3",
+      "file": "20261007-075321-optimized-stress-night.json",
+      "sha256": "465bfb1a0f3c7f2437dbad2a41d958eaf4b8a4667b2088fb447a738086069768",
+      "bytes": 977379,
+      "batched": false,
+      "valid": true,
+      "interruptions": [],
+      "canvas": [
+        1280,
+        788
+      ],
+      "dpr": 1,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "sampledResolutions": [
+        "1280x788"
+      ],
+      "fps": 51.55228466292737,
+      "frameMs": {
+        "max": 41,
+        "p50": 18,
+        "p95": 29,
+        "p99": 34
+      },
+      "cpuSubmissionMs": {
+        "max": 9,
+        "p50": 2.0000000000582077,
+        "p95": 4.000000000058208,
+        "p99": 5.000000000058208
+      },
+      "framesOver50Ms": 0,
+      "samples": 1443,
+      "inputCount": 111,
+      "inputNextSubmissionMs": {
+        "max": 27,
+        "p50": 13,
+        "p95": 24,
+        "p99": 25
+      },
+      "finalPhase": "detail",
+      "finalPending": false,
+      "finalAlbumMatches": true,
+      "documentLayoutMs": 2,
+      "geometryCount": 23,
+      "geometryEqualToWarmup": true,
+      "geometrySha256": "7b34bfabbfe6c134254c634a93b26a7948f1359e0c02d9662c5cf6a4711eccac",
+      "menuFrame": {
+        "atMs": 22955,
+        "cpuMs": 9,
+        "nextRafIntervalMs": 26,
+        "sceneWork": {
+          "atlasUploadMs": 0,
+          "coverCache": {
+            "bytes": 119275520,
+            "logicalSlots": 432,
+            "printHits": 495,
+            "printMisses": 12,
+            "printedCovers": 11,
+            "tiles": 23,
+            "uniqueTiles": 26
+          },
+          "frameTime": 448.562,
+          "outgoing": 0,
+          "renderSubmissionMs": 0,
+          "resized": false,
+          "resolutionMs": 0,
+          "updateMs": 1
+        }
+      },
+      "libraryComparisonMaxMs": 0.9999999999417925,
+      "libraryChanged": false
+    },
+    {
+      "tag": "B2",
+      "file": "20261007-075427-optimized-stress-night.json",
+      "sha256": "980227ea12098849cf99b830216594dcceed253264d5ba84dddd2ae914ea3d28",
+      "bytes": 946208,
+      "batched": true,
+      "valid": true,
+      "interruptions": [],
+      "canvas": [
+        1280,
+        788
+      ],
+      "dpr": 1,
+      "quality": {
+        "anisotropy": 16,
+        "antialias": "off",
+        "aoResolution": 1,
+        "aoSamples": 32,
+        "depthOfField": 100,
+        "pixelRatio": 1.5,
+        "scale": 100,
+        "shadows": 2048,
+        "transmission": 1
+      },
+      "sampledResolutions": [
+        "1280x788"
+      ],
+      "fps": 49.13408319942867,
+      "frameMs": {
+        "max": 122,
+        "p50": 18,
+        "p95": 32,
+        "p99": 39
+      },
+      "cpuSubmissionMs": {
+        "max": 23,
+        "p50": 2.0000000000582077,
+        "p95": 5,
+        "p99": 6
+      },
+      "framesOver50Ms": 2,
+      "samples": 1376,
+      "inputCount": 111,
+      "inputNextSubmissionMs": {
+        "max": 34,
+        "p50": 13.999999999941792,
+        "p95": 26.999999999941792,
+        "p99": 32
+      },
+      "finalPhase": "detail",
+      "finalPending": false,
+      "finalAlbumMatches": true,
+      "documentLayoutMs": 0,
+      "geometryCount": 23,
+      "geometryEqualToWarmup": true,
+      "geometrySha256": "7b34bfabbfe6c134254c634a93b26a7948f1359e0c02d9662c5cf6a4711eccac",
+      "menuFrame": {
+        "atMs": 22960,
+        "cpuMs": 11.999999999941792,
+        "nextRafIntervalMs": 29,
+        "sceneWork": {
+          "atlasUploadMs": 0,
+          "coverCache": {
+            "bytes": 119275520,
+            "logicalSlots": 432,
+            "printHits": 596,
+            "printMisses": 12,
+            "printedCovers": 11,
+            "tiles": 23,
+            "uniqueTiles": 26
+          },
+          "frameTime": 514.753,
+          "outgoing": 0,
+          "renderSubmissionMs": 1,
+          "resized": false,
+          "resolutionMs": 0,
+          "updateMs": 0.9999999999417925
+        }
+      },
+      "libraryComparisonMaxMs": 1.000000000116415,
+      "libraryChanged": false
+    }
+  ],
+  "conclusion": {
+    "defaultEnabled": false,
+    "reason": "1–2 ms local layout reduction without consistent frame or input improvement beyond A/A variation",
+    "notProven": [
+      "GPU execution durations",
+      "OS input-to-photon latency",
+      "cold-start causal attribution",
+      "full two-theme long-playlist visual equivalence",
+      "Metal or raytracing advantage"
+    ],
+    "appleSync": {
+      "authorization": "Allowed after normal in-app action; no system window interaction required",
+      "playlists": 2,
+      "trackEntries": 35,
+      "completedLocalTime": "2026-10-07 15:56:03 +08:00",
+      "pendingFeedbackCleared": true,
+      "syncButtonReenabled": true
+    },
+    "restored": {
+      "smoothMotion": true,
+      "theme": "night",
+      "qualityPreset": "original",
+      "reducedMotion": false,
+      "selection": "original first album in archive",
+      "playing": false,
+      "position": 0,
+      "batched": false
+    }
+  }
+}
