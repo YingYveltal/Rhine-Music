@@ -285,6 +285,20 @@ mod tests {
         assert_eq!(d.applied,2);assert_eq!(d.snapshot()["transport"],"idle");assert_eq!(d.snapshot()["playing"],false);
     }
     #[test]
+    fn late_failed_apple_play_cannot_replace_a_newer_success() {
+        let local=Arc::new(FakeLocal::default());let native=Arc::new(FakeNative::default());
+        let mut d=Driver::new(local.clone(),native.clone());
+        d.accept(Envelope{receipt:1,command:apple_play()});
+        native.take("stop").send(Ok(native_state("idle"))).unwrap();local.finish(1,"idle");d.advance();
+        let obsolete=native.take("play");
+        d.accept(Envelope{receipt:2,command:apple_play()});
+        native.take("stop").send(Ok(native_state("idle"))).unwrap();local.finish(2,"idle");d.advance();
+        native.take("play").send(Ok(native_state("playing"))).unwrap();d.advance();
+        assert!(obsolete.send(Err("old queue identity failed".into())).is_err());
+        let state=d.snapshot();
+        assert_eq!(state["appliedCommand"],2);assert_eq!(state["playing"],true);assert!(state["error"].is_null());
+    }
+    #[test]
     fn settings_receipt_cannot_jump_over_unfinished_transport() {
         let local=Arc::new(FakeLocal::default());let native=Arc::new(FakeNative::default());
         let mut d=Driver::new(local.clone(),native.clone());
