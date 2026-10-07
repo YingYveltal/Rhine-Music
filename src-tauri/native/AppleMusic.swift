@@ -3,6 +3,14 @@ import MusicKit
 import CryptoKit
 import ImageIO
 
+@_cdecl("rhine_apple_artwork_trace")
+func rhineAppleArtworkTrace(_ raw: UnsafePointer<CChar>) { NSLog("RhineArtwork %@", String(cString: raw)) }
+@available(macOS 14.0, *)
+private func traceArtwork(_ stage: String, _ artwork: Artwork?) {
+    let url = artwork?.url(width: 600, height: 600)
+    NSLog("RhineArtwork %@ artwork=%d url=%d scheme=%@", stage, artwork != nil ? 1 : 0, url != nil ? 1 : 0, url?.scheme ?? "none")
+}
+
 // Validate downloaded/cached artwork before exposing it to all frontend views.
 @_cdecl("rhine_apple_artwork_valid")
 func rhineAppleArtworkValid(_ bytes: UnsafePointer<UInt8>, _ count: Int) -> UInt8 {
@@ -58,6 +66,7 @@ private func digest(_ fields: [String]) -> String {
         return result
     }
     func firstSongArtworkURL(_ song: Song) async -> URL? {
+        traceArtwork("first-direct", song.artwork)
         if let url = song.artwork?.url(width: 600, height: 600) { return url }
         // Playlist relationships may supply a sparse Song. Hydrate only its
         // exact library identity, never a title/artist search or another track.
@@ -66,10 +75,13 @@ private func digest(_ fields: [String]) -> String {
         request.filter(matching: \.id, equalTo: song.id)
         if let response = try? await request.response(),
            let match = response.items.first, match.id == song.id { full = match }
+        traceArtwork("first-hydrated", full.artwork)
         if let url = full.artwork?.url(width: 600, height: 600) { return url }
         if let detailed = try? await full.with(.albums, preferredSource: .library) {
+            traceArtwork("first-album", detailed.albums?.first?.artwork)
             return detailed.albums?.first?.artwork?.url(width: 600, height: 600)
         }
+        NSLog("RhineArtwork first-album request-failed")
         return nil
     }
     func sync() async throws -> [[String: Any]] {
@@ -110,6 +122,7 @@ private func digest(_ fields: [String]) -> String {
                 "artist": playlist.curatorName ?? "Apple Music", "genreId": "apple-playlists", "rawGenres": [],
                 "folder": "", "tracks": rows, "producers": [], "offline": false, "complete": true,
                 "loadError": NSNull(), "snapshotRevision": revision]
+            traceArtwork("playlist", playlist.artwork)
             if let url = playlist.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
             // Only the original first entry's song artwork is eligible. Do not
             // scan later tracks, substitute a music-video thumbnail, or search.
