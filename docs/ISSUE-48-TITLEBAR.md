@@ -17,3 +17,11 @@
 实际包 Info.plist 没有 NSRequiresAquaSystemAppearance 禁用项，Mach-O 使用 SDK 26.2/min14.0。锁定 Tao 0.37.1 的 set_theme 只设置 NSApp.appearance；新增候选在主线程给当前 NSWindow 显式设置公开 Aqua/DarkAqua appearance，让 AppKit 标题与控件使用窗口外观。与 Apple 的 [窗口/视图 appearance 说明](https://developer.apple.com/documentation/appkit/nsappearancecustomization)一致，不改系统全局设置、Info.plist、标题文字颜色或私有子视图。
 
 命令改为异步等待主线程回调完成，调度/取窗口/取外观失败会返回错误，前端仍串行提交；等待移至 blocking worker，不阻塞 AppKit 主线程。沿用现有 Objective-C FFI 方式，没有新增依赖。这个窗口级补充仍须新组合包编译和实窗确认，尚未宣称黑字问题已修复。
+
+## d1557fe 组合包实测：标题文字仍未通过
+
+2026-10-07，组合提交 `d1557fe0c3a2c90001f4ff17670aaf1ddeb2cb53` 包含本分支代码 `754b91d` 和播放器修复。构建、打包及严格 ad-hoc 签名检查成功；可执行文件 SHA256 为 `641a6b36e8a551bb0d6e424e255e6d6cd3c2c8edebb6278bda75458c1b7a9494`。编译报告本模块与既有 `preview.rs` 的 `objc_msgSend` 声明签名冲突警告，未把编译成功视为无警告。
+
+通过完整 app 路径检查：暖昼标题可读，深夜背景变暗后标题字仍黑；Raise 窗口后不变。连续暖昼→深夜→暖昼→深夜后最终按钮和背景落在深夜；Cmd+Q 后再次检查出现新进场，进场结束仍保留深夜，但黑字问题依旧。全程播放 off、进度 0，没有启动媒体或修改账户。截图均带紫色系统共享指示；该系统呈现是否影响标题绘制尚未证明。
+
+结论：显式 NSWindow appearance 候选未通过标题文字可读性验收，不据此合并或交付为已修复。设备已交还总控独立观察；本轮没有继续测试拖动、最小化、缩放、关闭按钮，也没有测试性能候选。下一步先确认真实原生标题与捕获呈现的关系，再决定保留或撤回窗口级补充。
