@@ -10,7 +10,7 @@
 - 同步从个人 Playlist 分页读取 entries 和 tracks，核对数量和完整顺序，保存不同出现位置，不按曲名去重。原型10/250限制已移除。分页/顺序失败保留上次完整缓存，显示 job.error，不提交半份曲库。
 - 缓存位于当前应用数据目录的 `apple/library.json`，封面单独保存在 `apple/covers`。关闭来源保留缓存与偏好；重新启动可显示缓存。点播时若原生对象尚未载入，重新读库恢复引用；快照发生变化则明确要求重新同步，不猜测匹配。
 - `/api/library` 增加 apple 状态及 source=apple、kind=playlist 卡片，曲目ID是带快照版本和位置的不透明出现条目ID。同样的条目序列重复同步ID稳定；平台条目或顺序变化后生成新版本，旧ID需要重新同步后点播。browserPlayable=false，原生支持类型独立判断，缺少playParameters不阻断MusicKit真实尝试。不会伪造本地路径、编码器或音频下载地址；封面使用现有本地资源协议。
-- 原生队列使用已验证的 typed Track 构造器。所选 Track 的平台ID在请求队列内重复时，目前显式返回“无法唯一定位”，避免 SDK startingAt 选错同曲位置。重复项仍完整展示，自动队列映射按全序条目和 queueGeneration 维护；重复项可用性需组合验收。
+- 原生队列仅包含当前支持的音频 typed Track；不支持的视频仍保留在资料库展示，直接点选会明确报错。筛选队列保留原始出现位置，状态返回原列表索引。先 prepareToPlay，再核对命令未过期、完整顺序/标题、runtime ID 唯一性与所选位置，通过后才 play；失败或未绑定的队列不能直接恢复/切歌。所选 Track 的平台ID在请求队列内重复时，目前显式返回“无法唯一定位”，避免 SDK startingAt 选错同曲位置。重复项仍完整展示，自动队列映射按全序条目和 queueGeneration 维护；重复项可用性需组合验收。
 
 示例位于 [API样例](apple-native-api-examples.json)，均为人工构造的脱敏契约示例，不是真实账户或验收记录。
 

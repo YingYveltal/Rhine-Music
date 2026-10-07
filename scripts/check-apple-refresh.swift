@@ -111,6 +111,51 @@ import Foundation
             _ = try await readApplePages(initial: [1], hasNext: true, next: { throw ReadFailure.incompletePage })
             preconditionFailure("Pagination errors must propagate")
         } catch ReadFailure.incompletePage { }
+        // Stop, pause and replacement Play during prepare must never reach play().
+        for cancelled in ["stop", "pause", "replacement"] {
+            var events: [String] = [], generation = 1, intent = "playing"
+            let ticket = generation
+            do {
+                try await startVerifiedAppleQueue(prepare: {
+                    events.append("prepare")
+                    if cancelled == "pause" { intent = "paused" }
+                    else { generation += 1; if cancelled == "stop" { intent = "idle" } }
+                },
+                    canStart: { ticket == generation && intent == "playing" }, verify: { events.append("verify") }, play: { events.append("play") })
+                preconditionFailure("Cancelled preparation must fail: \(cancelled)")
+            } catch { precondition(events == ["prepare"]) }
+        }
+        var startEvents: [String] = []
+        do {
+            try await startVerifiedAppleQueue(prepare: { startEvents.append("prepare") }, canStart: { true },
+                verify: { startEvents.append("verify"); throw ReadFailure.unavailable }, play: { startEvents.append("play") })
+            preconditionFailure("Unverified queue must never start")
+        } catch { precondition(startEvents == ["prepare", "verify"]) }
+        startEvents = []
+        try await startVerifiedAppleQueue(prepare: { startEvents.append("prepare") }, canStart: { true },
+            verify: { startEvents.append("verify") }, play: { startEvents.append("play") })
+        precondition(startEvents == ["prepare", "verify", "play"])
+        // Unsupported media must not reorder or renumber library occurrences.
+        let audioOnly = try appleAudioQueuePlan([true, true, true], selected: 1)
+        precondition(audioOnly.indices == [0, 1, 2] && audioOnly.selected == 1)
+        for flags in [[false, true, false, true, false], [true, false, true], [true, true, false]] {
+            for selected in flags.indices where flags[selected] {
+                let plan = try appleAudioQueuePlan(flags, selected: selected)
+                precondition(plan.indices[plan.selected] == selected)
+                precondition(plan.indices == flags.indices.filter { flags[$0] })
+                // Duplicate songs retain separate original occurrences.
+                precondition(Set(plan.indices).count == plan.indices.count)
+            }
+            for selected in flags.indices where !flags[selected] {
+                do { _ = try appleAudioQueuePlan(flags, selected: selected); preconditionFailure("Video selection must remain unsupported") }
+                catch { precondition((error as NSError).domain == "RhineApple") }
+            }
+        }
+        for selected in [-1, 0, 2] {
+            do { _ = try appleAudioQueuePlan([], selected: selected); preconditionFailure("Empty queue cannot start") }
+            catch { precondition((error as NSError).domain == "RhineApple") }
+        }
+        print("Apple audio queue mapping passed: leading/middle/trailing unsupported items, original positions, unsupported selections, empty queues.")
         print("Apple library album policies passed: subset, empty/retry failures, numbering, identity, year, pagination. No account/network access.")
         print("Apple playlist refresh: 6 policy checks passed (no account or network access).")
     }
