@@ -57,6 +57,21 @@ private func digest(_ fields: [String]) -> String {
         }
         return result
     }
+    func firstSongArtworkURL(_ song: Song) async -> URL? {
+        if let url = song.artwork?.url(width: 600, height: 600) { return url }
+        // Playlist relationships may supply a sparse Song. Hydrate only its
+        // exact library identity, never a title/artist search or another track.
+        var full = song
+        var request = MusicLibraryRequest<Song>(); request.limit = 1
+        request.filter(matching: \.id, equalTo: song.id)
+        if let response = try? await request.response(),
+           let match = response.items.first, match.id == song.id { full = match }
+        if let url = full.artwork?.url(width: 600, height: 600) { return url }
+        if let detailed = try? await full.with(.albums, preferredSource: .library) {
+            return detailed.albums?.first?.artwork?.url(width: 600, height: 600)
+        }
+        return nil
+    }
     func sync() async throws -> [[String: Any]] {
         try checkAuthorization()
         guard !syncing else { throw failure("资料库正在同步") }
@@ -98,9 +113,10 @@ private func digest(_ fields: [String]) -> String {
             if let url = playlist.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
             // Only the original first entry's song artwork is eligible. Do not
             // scan later tracks, substitute a music-video thumbnail, or search.
-            if let first = tracks.first, case .song(let song) = first,
-               let url = song.artwork?.url(width: 600, height: 600) {
-                album["firstTrackArtworkURL"] = url.absoluteString
+            if let first = tracks.first, case .song(let song) = first {
+                if let url = await firstSongArtworkURL(song) {
+                    album["firstTrackArtworkURL"] = url.absoluteString
+                }
             }
             nextAlbums.append(album); completed += 1
         }
