@@ -9,3 +9,11 @@
 已检查：TypeScript、git diff --check；对照本机锁定 Tauri 2.12.1 与 Tao 的实现确认调用签名及应用级外观语义。没有在正在复现播放错误的设备上运行 Cargo 编译、GUI 或音频。本机未安装 rustfmt，未完成该格式工具检查；Rust 编译由后续 CI/组合包确认。
 
 待真实窗口验收：暖昼→深夜→暖昼、快速切换、保存深夜后关闭重开，以及标题栏拖动/最小化/缩放/关闭。当前尚无这些项目的真实验收结果，不以类型检查代替窗口观察；不能宣称其它设备或系统外观组合均已验证。
+
+## 组合包发现的标题文字问题
+
+总控及执行者在 `c8ef0ae` 组合包（含 e0e6632）上观察到：暖昼/深夜标题栏背景能切换，但深夜原生标题仍呈黑色，不能视为整项验收通过。执行者经完整 app 路径复核时播放为 off/0，没有操作播放；窗口左上有系统共享指示，尚未排除共享状态对系统标题绘制的影响。
+
+实际包 Info.plist 没有 NSRequiresAquaSystemAppearance 禁用项，Mach-O 使用 SDK 26.2/min14.0。锁定 Tao 0.37.1 的 set_theme 只设置 NSApp.appearance；新增候选在主线程给当前 NSWindow 显式设置公开 Aqua/DarkAqua appearance，让 AppKit 标题与控件使用窗口外观。与 Apple 的 [窗口/视图 appearance 说明](https://developer.apple.com/documentation/appkit/nsappearancecustomization)一致，不改系统全局设置、Info.plist、标题文字颜色或私有子视图。
+
+命令改为异步等待主线程回调完成，调度/取窗口/取外观失败会返回错误，前端仍串行提交；等待移至 blocking worker，不阻塞 AppKit 主线程。沿用现有 Objective-C FFI 方式，没有新增依赖。这个窗口级补充仍须新组合包编译和实窗确认，尚未宣称黑字问题已修复。
