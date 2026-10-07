@@ -39,6 +39,17 @@ private func digest(_ fields: [String]) -> String {
     return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
 }
 
+// A zero/zero response can be a real empty playlist or a relationship that
+// has not arrived yet. Re-read once, without treating repeated emptiness as proof.
+func retryEmptyPlaylistRead<Entry, Item>(
+    read: () async throws -> (entries: [Entry], tracks: [Item]),
+    reread: () async throws -> (entries: [Entry], tracks: [Item])
+) async throws -> (entries: [Entry], tracks: [Item]) {
+    let result = try await read()
+    if result.entries.isEmpty && result.tracks.isEmpty { return try await reread() }
+    return result
+}
+
 @available(macOS 14.0, *)
 @MainActor private final class AppleBridge {
     static let shared = AppleBridge()
@@ -93,12 +104,27 @@ private func digest(_ fields: [String]) -> String {
         total = playlists.count
         var nextItems: [String: Item] = [:], nextAlbums: [[String: Any]] = []
         for playlist in playlists {
-            let e = try await playlist.with(.entries, preferredSource: .library)
-            let t = try await playlist.with(.tracks, preferredSource: .library)
-            guard let entryCollection = e.entries, let trackCollection = t.tracks else {
-                throw failure("歌单内容暂时不可用，已保留上次完整曲库")
-            }
-            let entries = try await all(entryCollection), tracks = try await all(trackCollection)
+            let contents = try await retryEmptyPlaylistRead(read: {
+                let e = try await playlist.with(.entries, preferredSource: .library)
+                let t = try await playlist.with(.tracks, preferredSource: .library)
+                guard let entryCollection = e.entries, let trackCollection = t.tracks else {
+                    throw failure("歌单内容暂时不可用，已保留上次完整曲库")
+                }
+                return (try await all(entryCollection), try await all(trackCollection))
+            }, reread: {
+                var freshRequest = MusicLibraryRequest<Playlist>(); freshRequest.limit = 1
+                freshRequest.filter(matching: \.id, equalTo: playlist.id)
+                let response = try await freshRequest.response()
+                guard let fresh = response.items.first, fresh.id == playlist.id else {
+                    throw failure("歌单已变化，已保留上次完整曲库；请稍后重新同步")
+                }
+                let full = try await fresh.with(.entries, .tracks, preferredSource: .library)
+                guard let entryCollection = full.entries, let trackCollection = full.tracks else {
+                    throw failure("歌单内容暂时不可用，已保留上次完整曲库")
+                }
+                return (try await all(entryCollection), try await all(trackCollection))
+            })
+            let entries = contents.entries, tracks = contents.tracks
             guard entries.count == tracks.count,
                   zip(entries, tracks).allSatisfy({ $0.title == $1.title && $0.artistName == $1.artistName }) else {
                 throw failure("歌单顺序无法核对，已保留上次完整曲库")
@@ -118,8 +144,10 @@ private func digest(_ fields: [String]) -> String {
             }
             var album: [String: Any] = ["id": albumID, "source": "apple", "kind": "playlist", "title": playlist.name,
                 "artist": playlist.curatorName ?? "Apple Music", "genreId": "apple-playlists", "rawGenres": [],
-                "folder": "", "tracks": rows, "producers": [], "offline": false, "complete": true,
-                "loadError": NSNull(), "snapshotRevision": revision]
+                "folder": "", "tracks": rows, "producers": [], "offline": false, "complete": !entries.isEmpty,
+                "loadError": entries.isEmpty
+                    ? "本次未读取到歌曲。若这本来是空歌单可忽略；若已有歌曲，请稍后重新同步。" as Any
+                    : NSNull(), "snapshotRevision": revision]
             if let url = playlist.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
             // Only the original first entry's song artwork is eligible. Do not
             // scan later tracks, substitute a music-video thumbnail, or search.
@@ -130,7 +158,8 @@ private func digest(_ fields: [String]) -> String {
             }
             nextAlbums.append(album); completed += 1
         }
-        // Publish only a complete snapshot. An active queue keeps its own objects.
+        // Publish after all reads finish; uncertain empty relationships remain marked.
+        // An active queue keeps its own objects.
         items = nextItems; albums = nextAlbums
         return albums
     }

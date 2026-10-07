@@ -842,7 +842,7 @@ function renderDetail() {
   );
   const fields = apple ? [
     ["SOURCE / 来源", "Apple Music 歌单"],
-    ["TRACKS / 曲目", `${a.tracks.length} 首${a.complete === false ? "（部分内容）" : ""}`],
+    ["TRACKS / 曲目", `${a.tracks.length} 首${a.complete === false ? (a.tracks.length ? "（部分内容）" : "（未确认）") : ""}`],
     ["DURATION / 总时长", time(albumDuration(a))],
   ] : [
     ["RELEASE / 发行年份", a.year || "未提供"],
@@ -876,7 +876,7 @@ function trackList(a: MusicAlbum, discs: number) {
   if (apple) discs = 1;
   const notice = apple && (a.complete === false || a.loadError)
     ? `<p role="status">${esc(a.loadError || "歌单尚未完整同步，仅显示已读取的曲目。")}</p><button data-action="library" class="text-button">重新同步歌单 ↗</button>` : "";
-  if (apple && !a.tracks.length) return `<div class="empty-tracks"><strong>${a.complete === false || a.loadError ? "歌单尚未完整读取" : "这个歌单暂时没有歌曲"}</strong>${notice || '<p>可在“音乐”App 中添加歌曲后重新同步。</p><button data-action="library">打开音乐库 ↗</button>'}</div>`;
+  if (apple && !a.tracks.length) return `<div class="empty-tracks"><strong>${a.complete === false || a.loadError ? "本次未读取到歌曲" : "这个歌单暂时没有歌曲"}</strong>${notice || '<p>可在“音乐”App 中添加歌曲后重新同步。</p><button data-action="library">打开音乐库 ↗</button>'}</div>`;
   if (!a.tracks.length)
     return `<div class="empty-tracks"><strong>${demo ? "这是一张封面演示卡片" : "这个专辑还没有可播放曲目"}</strong><p>${demo ? "用于检查封面原始比例与卡片材质。扫描本地音乐库后，这里会显示真实曲目。" : "请检查音乐文件是否完整，并重新扫描音乐库。"}</p><button data-action="library">打开音乐库设置 ↗</button></div>`;
   let disc = -1;

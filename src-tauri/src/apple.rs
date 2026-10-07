@@ -96,6 +96,7 @@ impl Apple {
         let c = self.cache.lock().unwrap(); let mut s = c.status.clone();
         s["enabled"] = json!(c.enabled); s["updatedAt"] = json!(c.updated_at);
         s["playlistCount"] = json!(c.albums.len());
+        s["unconfirmedPlaylistCount"] = json!(c.albums.iter().filter(|a| a["complete"] == false).count());
         s["trackCount"] = json!(c.albums.iter().map(|a|a["tracks"].as_array().map_or(0,Vec::len)).sum::<usize>());
         s
     }
@@ -262,6 +263,33 @@ mod tests {
         fn call(&self, _: &str, _: Value) -> Response {
             let(tx,rx)=bounded(1);tx.send(self.0.lock().unwrap().take().unwrap()).unwrap();rx
         }
+    }
+    #[test]
+    fn unconfirmed_empty_does_not_block_other_playlists_or_claim_a_complete_library() {
+        let dir=tempfile::tempdir().unwrap();let mut apple=Apple::new(dir.path()).unwrap();
+        let this=Arc::get_mut(&mut apple).unwrap();
+        // Empty reads retain the normal snapshot replacement behavior. They
+        // carry uncertainty explicitly, rather than silently claiming success.
+        {let mut c=this.cache.lock().unwrap();c.albums=vec![json!({"id":"empty","complete":true,
+            "tracks":[{"id":"old"}]})];this.save(&c).unwrap();}
+        let albums=json!([
+            {"id":"empty","complete":false,"loadError":"本次未读取到歌曲","tracks":[]},
+            {"id":"populated","complete":true,"tracks":[{"id":"one"},{"id":"two"}]}]);
+        this.native=Arc::new(Fake(Mutex::new(Some(Ok(albums.clone())))));
+        this.sync();
+        assert_eq!(this.albums(),albums.as_array().unwrap().clone());
+        let status=this.status();assert_eq!(status["playlistCount"],2);
+        assert_eq!(status["trackCount"],2);assert_eq!(status["unconfirmedPlaylistCount"],1);
+        assert_eq!(status["job"]["running"],false);assert!(status["job"]["error"].is_null());
+        let reopened=Apple::new(dir.path()).unwrap();
+        assert_eq!(reopened.status()["unconfirmedPlaylistCount"],1);
+        assert_eq!(reopened.albums(),this.albums());
+        // A later populated response naturally removes the uncertainty.
+        this.native=Arc::new(Fake(Mutex::new(Some(Ok(json!([
+            {"id":"empty","complete":true,"tracks":[{"id":"restored"}]}
+        ]))))));
+        this.sync();assert_eq!(this.status()["unconfirmedPlaylistCount"],0);
+        assert_eq!(this.albums()[0]["tracks"][0]["id"],"restored");
     }
     #[test]
     fn failed_sync_preserves_the_complete_snapshot_on_disk_and_in_memory() {
