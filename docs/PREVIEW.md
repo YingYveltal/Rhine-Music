@@ -2,13 +2,13 @@
 
 [← 首页](../README.md) · [文档导航](README.md) · [反馈问题](https://github.com/YingYveltal/Rhine-Music/issues)
 
-当前公开试用版为 **v0.1.0-preview.2**，适用 **Apple Silicon Mac（M 系列芯片）、macOS 14 或更新版本**。暂无 Intel Mac 或 Windows 安装包。Preview 仍在迭代，其他设备与账号的兼容性需要试用反馈。
+当前公开试用版为 **v0.1.0-preview.3**，适用 **Apple Silicon Mac（M 系列芯片）、macOS 14 或更新版本**。暂无 Intel Mac 或 Windows 安装包。Preview 仍在迭代，其他设备与账号的兼容性需要试用反馈。
 
 ## 下载与安装
 
-[**下载 macOS arm64 ZIP（约 41 MB）**](https://github.com/YingYveltal/Rhine-Music/releases/download/v0.1.0-preview.2/Rhine-Music-Preview-v0.1.0-preview.2-macOS-arm64.zip) · [Release 与校验文件](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.2)
+[**下载 macOS arm64 ZIP（约 41 MB）**](https://github.com/YingYveltal/Rhine-Music/releases/download/v0.1.0-preview.3/Rhine-Music-Preview-v0.1.0-preview.3-macOS-arm64.zip) · [Release 与校验文件](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.3)
 
-1. 下载 `Rhine-Music-Preview-v0.1.0-preview.2-macOS-arm64.zip`，完整解压。
+1. 下载 `Rhine-Music-Preview-v0.1.0-preview.3-macOS-arm64.zip`，完整解压。
 2. 将 **Rhine Music Preview.app** 拖到“应用程序”，再双击打开。运行安装包不需要 Node.js、Rust 或命令行。
 3. 初次没有曲库时，可选“先查看演示封面”体验浏览，再打开“音乐库”连接自己的音乐。演示模式只有抽象封面，没有歌曲。
 
@@ -48,7 +48,7 @@ Preview 使用独立身份，不读取或迁移旧 Rhine Music QQ 应用的登�
 
 同步结果保存在本机。再次同步会更新专辑与歌单，真正读取或分页失败时保留上次快照；本次未读到歌曲的集合会显示未确认提示。封面依次尝试集合自身、原顺序第一首歌曲的专辑封面，均不可用时显示占位。
 
-Apple Music 使用 MusicKit 原生播放，支持点播、暂停／继续、上一首／下一首、停止及进度调整。是否能播放取决于账号、订阅、地区和曲目可用性。
+Apple Music 使用 MusicKit 原生播放，支持点播、暂停／继续、上一首／下一首、停止及进度调整。播放队列仅包含支持的音频曲目，并保留原顺序；音乐视频仍可显示在集合中，直接点播会提示暂不支持。是否能播放取决于账号、订阅、地区和曲目可用性。
 
 ## 浏览与播放
 
@@ -69,7 +69,7 @@ Apple Music 使用 MusicKit 原生播放，支持点播、暂停／继续、上�
 | --- | --- |
 | Apple Music 应用内音量、切歌淡入淡出不可调 | 当前播放来源不支持这两项；使用输出设备可用的音量控制。部分输出设备本身也可能不支持系统音量滑块。[Issue #41](https://github.com/YingYveltal/Rhine-Music/issues/41) |
 | 新收藏的 Apple 内容有名称但暂时没有曲目 | 查看未确认提示，稍后重新同步；如果系统“音乐”中已有歌曲而 Rhine 仍为空，请反馈。有限空结果重读尚未解决全部偶发情况。[Issue #40](https://github.com/YingYveltal/Rhine-Music/issues/40) |
-| Apple Music 音乐视频条目 | 可保留在集合中，暂不支持视频播放 |
+| Apple Music 音乐视频条目 | 保留在集合中，不进入音频播放队列；点播时提示暂不支持 |
 | Apple 同一队列中的重复歌曲无法点播到指定位置 | 当前不能可靠唯一定位时会明确报错，不静默换成另一条 |
 | QQ 或 Apple 某首歌无法播放 | 检查登录、订阅、曲目权限与网络；缓存曲目不代表拥有播放权限 |
 | Apple 资料库访问被拒绝或受限 | 按面板提示在系统隐私／使用限制设置中检查授权，再回来重试 |
@@ -85,8 +85,10 @@ Preview 的曲库索引、封面和配置保存在 `~/Library/Application Suppor
 
 ## 版本与验证范围
 
-`v0.1.0-preview.2` 对应主线 `9cbc751ad01fd8e569e737136506fe4f0ce65516`，构建源码为内容相同的 `a8dc8b68bafa185ca4cd6905f879b5f24a05321a`。应用内部版本仍为 `0.1.0`。本次公开分发使用已验收的同一包，**文档更新不代表安装包重新编译**。
+`v0.1.0-preview.3` 标签直接对应构建源码 `d1557fe0c3a2c90001f4ff17670aaf1ddeb2cb53`。两项修复已合入主线 `fb69d41725830022ee63a0b44213072e96c2880b`，与构建源码仅标题栏验收文档不同，运行代码一致。应用内部版本仍为 `0.1.0`。本次公开分发使用用户已确认的同一安装包，**文档更新不代表安装包重新编译**。
 
-本包完成了开发 Mac 上的资料库同步、专辑点播、暂停／继续、切歌、停止、集合切换和播放中同步检查，以及独立复核。大规模分页、部分收藏、多碟和失败分支主要用合成样本验证；不等同于所有真实曲库、输出设备或主观音质均通过。
+本版修复深夜主题下原生标题栏背景不跟随的问题，以及含音乐视频的 Apple Music 专辑可能出现的“原生队列身份无法核对”。本机检查覆盖主题切换、快速切换和重开后的主题保持；Apple 播放实现完成了专辑点播、暂停／继续、切歌、停止和集合切换，以及总控独立复核。Apple 控制检查使用同一播放实现的前一组合包，最终包增加窗口外观处理并获用户确认。自动捕获曾显示深夜标题文字偏暗，保留这一观察，不据此承诺其他设备的外观表现。
+
+大规模分页、部分收藏、多碟和失败分支主要用合成样本验证；不等同于所有真实曲库、输出设备或主观音质均通过。新增内容空读及应用内音量限制仍按上表跟踪。
 
 Release 附件 `release.json`、`SHA256SUMS.txt` 和 `TRIAL-NOTES.md` 提供对应版本记录。开发者重建与隔离测试见[开发说明](DEVELOPMENT.md)；字体、声音及素材权利范围见 [NOTICE](../NOTICE.md)。

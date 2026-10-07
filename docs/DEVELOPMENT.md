@@ -2,7 +2,7 @@
 
 [← 文档导航](README.md) · [普通用户下载与使用](PREVIEW.md)
 
-本页面向源码开发者。仓库自 **2026-10-07** 起公开，当前公开试用包为 [v0.1.0-preview.2](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.2)。更新这里的文档不重新构建或替换已发布二进制。
+本页面向源码开发者。仓库自 **2026-10-07** 起公开，当前公开试用包为 [v0.1.0-preview.3](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.3)。更新这里的文档不重新构建或替换已发布二进制。
 
 ## 工程与环境
 

@@ -2,9 +2,11 @@
 
 **把本地音乐、QQ 音乐和 Apple Music，放进同一个玻璃唱片架。**
 
-[**下载 macOS 试用版 ↓**](https://github.com/YingYveltal/Rhine-Music/releases/download/v0.1.0-preview.2/Rhine-Music-Preview-v0.1.0-preview.2-macOS-arm64.zip) · [安装与使用](docs/PREVIEW.md) · [版本说明](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.2) · [反馈问题](https://github.com/YingYveltal/Rhine-Music/issues)
+[**下载 macOS 试用版 ↓**](https://github.com/YingYveltal/Rhine-Music/releases/download/v0.1.0-preview.3/Rhine-Music-Preview-v0.1.0-preview.3-macOS-arm64.zip) · [安装与使用](docs/PREVIEW.md) · [版本说明](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.3) · [反馈问题](https://github.com/YingYveltal/Rhine-Music/issues)
 
-**Apple Silicon（M 系列） · macOS 14+ · v0.1.0-preview.2 · 约 41 MB**
+**Apple Silicon（M 系列） · macOS 14+ · v0.1.0-preview.3 · 约 41 MB**
+
+本次更新修复深夜主题的原生标题栏，以及含音乐视频的 Apple Music 专辑播放错误。
 
 当前为公开 Preview，尚未经过 Apple 公证；暂无 Intel Mac 或 Windows 安装包。
 
@@ -49,7 +51,7 @@ QQ 与 Apple Music 的播放取决于自己的账号、订阅及曲目权限。�
 - **Apple Music 音量与淡入淡出：** 当前不支持应用内调整，请使用输出设备可用的音量控制。[Issue #41](https://github.com/YingYveltal/Rhine-Music/issues/41)
 - **偶发空同步：** 新加入的 Apple 资料库内容可能只读到名称而没有曲目。界面会提示未确认，可稍后重新同步；有限重读不代表问题已完全修复。[Issue #40](https://github.com/YingYveltal/Rhine-Music/issues/40)
 - **媒体支持：** 暂不支持 Apple Music 音乐视频播放，也不支持本地 DSF / DFF 播放；不承诺 DSD 或无损直出。
-- **验证范围：** 当前包在开发 Mac 上完成了有界实测与独立复核，其他设备、账号、网络环境仍需要试用反馈。详细范围和文件校验见 [Release](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.2)。
+- **验证范围：** 当前包在开发 Mac 上完成了有界实测与独立复核，其他设备、账号、网络环境仍需要试用反馈。详细范围和文件校验见 [Release](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.3)。
 
 遇到问题请在 [Issues](https://github.com/YingYveltal/Rhine-Music/issues) 提供版本、macOS 与芯片型号、复现步骤及错误提示。请先移除截图和日志里的账号、密钥、私人曲库及本机路径。
 

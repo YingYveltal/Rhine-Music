@@ -1,13 +1,13 @@
 # Rhine Music 文档
 
-[← 项目首页](../README.md) · [下载当前 Preview](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.2) · [反馈问题](https://github.com/YingYveltal/Rhine-Music/issues)
+[← 项目首页](../README.md) · [下载当前 Preview](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.3) · [反馈问题](https://github.com/YingYveltal/Rhine-Music/issues)
 
 ## 下载与使用
 
 | 想了解什么 | 从这里开始 |
 | --- | --- |
 | 兼容性、安装、连接三种音乐来源、操作与常见问题 | [Preview 使用说明](PREVIEW.md) |
-| 本次下载的改动、校验值与验证范围 | [v0.1.0-preview.2 Release](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.2) |
+| 本次下载的改动、校验值与验证范围 | [v0.1.0-preview.3 Release](https://github.com/YingYveltal/Rhine-Music/releases/tag/v0.1.0-preview.3) |
 | 项目来源、作者署名及资源权利 | [NOTICE](../NOTICE.md) · [代码许可证](../LICENSE) |
 
 ## 开发与维护
