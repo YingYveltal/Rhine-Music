@@ -1,3 +1,4 @@
+import { captureFrameCandidatePixels, frameCandidatePng } from "./frame-candidate-validation";
 import { motionDelta } from "./motion.ts";
 import { captureForMetal } from "./metal-capture";
 import { installFusedOutput } from "./fused-output";
@@ -85,8 +86,19 @@ export class ArchiveScene {
   private ao: SSAOPass;
   private bokeh: BokehPass;
   renderingOptimized = true;
+  // Diagnostic candidates retain production defaults until matched A/B verification.
+  opaqueDepthPrepassEnabled = true;
+  preciseCullingEnabled = false;
   readonly motionResolution = new MotionResolution();
   private fullResolutionPixels = 0;
+  // Opt-in CPU wall-clock diagnostics. Never interpreted as GPU timings.
+  measureFrame = false;
+  frameWork?: {
+    frameTime: number; updateMs: number; atlasUploadMs: number;
+    resolutionMs: number; renderSubmissionMs: number; resized: boolean;
+    outgoing: number; visibleInstances?: number; coverCache: ReturnType<ArchiveScene['measurementCounters']>['coverCache'];
+  };
+  measurementCounters() { return { outgoing: this.outgoing.length, coverCache: this.covers?.cacheStats }; }
   // Kept as developer experiments: matched Retina playback did not establish
   // an end-to-end speedup, even though Metal's isolated fused pass is faster.
   postFusionEnabled = false;
@@ -1133,6 +1145,8 @@ export class ArchiveScene {
     time: number,
     cinematic?: { reveal: number; lift: number; zoom: number; time: number; musicIntro?: boolean },
   ) {
+    const workStart = this.measureFrame ? performance.now() : 0;
+    this.frameWork = undefined;
     const dt = motionDelta(time - this.last);
     this.last = time;
     this.clock = time;
@@ -1751,12 +1765,25 @@ export class ArchiveScene {
     if (musicLibrary && this.renderer.shadowMap.enabled)
       this.renderer.shadowMap.needsUpdate = true;
     this.instanceVisibility.capture([...this.instances,...(this.covers?[this.covers.array]:[])]);
+    const uploadStart = this.measureFrame ? performance.now() : 0;
     this.covers?.flushUploads(this.renderer);
+    const resolutionStart = this.measureFrame ? performance.now() : 0;
     const oldScale=this.motionResolution.scale;
     this.motionResolution.update(time,this.interactionPose().concat(this.rotation),
       !this.reduced && !this.nativeMetal.preparing && !this.nativeMetal.stats.active,this.fullResolutionPixels,idle);
     if (this.motionResolution.scale!==oldScale) this.resize();
+    const renderStart = this.measureFrame ? performance.now() : 0;
     this.renderCurrentFrame();
+    if (this.measureFrame) this.frameWork = {
+      frameTime: time,
+      updateMs: uploadStart - workStart,
+      atlasUploadMs: resolutionStart - uploadStart,
+      resolutionMs: renderStart - resolutionStart,
+      renderSubmissionMs: performance.now() - renderStart,
+      resized: this.motionResolution.scale !== oldScale,
+      visibleInstances: this.instanceVisibility.stats.submitted,
+      ...this.measurementCounters(),
+    };
     if (this.pendingHover) {
       this.pendingHover = false;
       if (this.reveal >= 0.8 && this.detail <= 0.2 && records.length) {
@@ -1779,12 +1806,12 @@ export class ArchiveScene {
     this.output.enabled = !fuse;
     this.bokeh.materialBokeh.uniforms.rhineFusedOutput.value = fuse;
     this.bokeh.materialBokeh.uniforms.toneMappingExposure.value = this.renderer.toneMappingExposure;
-    (this.composer.passes[0] as DepthPrepass).optimized=this.renderingOptimized&&musicLibrary;
+    (this.composer.passes[0] as DepthPrepass).optimized=this.renderingOptimized&&musicLibrary&&this.opaqueDepthPrepassEnabled;
     this.selectionLighting?.setVertexLighting(this.renderingOptimized);
     this.bokeh.materialBokeh.uniforms.rhineFastBokeh.value=this.renderingOptimized;
     this.scene.updateMatrixWorld();
     if(this.renderer.shadowMap.enabled)this.light.shadow.updateMatrices(this.light);
-    this.instanceVisibility.apply(this.camera,this.renderer.shadowMap.enabled?this.light.shadow.getFrustum():undefined,this.renderingOptimized&&musicLibrary);
+    this.instanceVisibility.apply(this.camera,this.renderer.shadowMap.enabled?this.light.shadow.getFrustum():undefined,this.renderingOptimized&&musicLibrary, this.preciseCullingEnabled);
     const automatic = this.scene.matrixWorldAutoUpdate;
     if (this.renderingOptimized) {
       // All passes see one scene pose. Do not traverse it again for AO and DOF.
@@ -1820,6 +1847,39 @@ export class ArchiveScene {
   }
   interactionPose() {
     return [...this.camera.position.toArray(),...this.cameraAim.toArray(),...this.model.position.toArray(),this.rail.value,this.columnCamera.value,this.detail];
+  }
+  validateFrameCandidate() {
+    const culling = this.preciseCullingEnabled;
+    const depth = this.opaqueDepthPrepassEnabled;
+    if (culling === !depth) throw new Error("Select exactly one candidate before comparing");
+    const candidate = culling ? "precise-culling" : "without-opaque-prepass";
+    const gl = this.renderer.getContext();
+    const width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
+    const stats: ReturnType<ArchiveScene["getStats"]>[] = [];
+    const result = captureFrameCandidatePixels({
+      enabled: () => true,
+      setEnabled: enabled => {
+        this.preciseCullingEnabled = culling && enabled;
+        this.opaqueDepthPrepassEnabled = depth || !enabled;
+      },
+      read: () => {
+        this.renderer.info.reset();
+        this.renderCurrentFrame();
+        const pixels = new Uint8Array(width * height * 4);
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        stats.push(this.getStats());
+        return pixels;
+      },
+    });
+    return { label: "frame-candidate-visual", candidate, measuredAt: new Date().toISOString(),
+      viewport: [innerWidth, innerHeight], devicePixelRatio, canvas: [width, height],
+      quality: this.quality, theme: this.theme, phase: this.musicPresentationPhase,
+      pose: this.interactionPose(), outgoing: this.outgoing.map(o => ({cell:o.cell, position:o.group.position.toArray()})),
+      aa: result.aa, ab: result.ab, restored: result.restored, pixelGate: result.pixelGate,
+      frames: result.frames.map((frame, i) => ({name:frame.name, enabled:frame.enabled,
+        stats:stats[i+2], png:frameCandidatePng(frame.pixels,width,height)})),
+      note: "Frozen pose A/A/B/A readback; never performance timings. No animation updates between renders."
+    };
   }
   validateRenderingOptimization() {
     const gl = this.renderer.getContext();

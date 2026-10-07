@@ -33,7 +33,7 @@ import {
 import { MusicPlayer, type MusicPlayerState } from "./music-player";
 import { isNative, nativeInvoke, nativeRequest, NativeMusicPlayer } from "./native";
 import { appendMusicFolders } from "./library-folders";
-import { beginMeasurement, recordInteraction, sampleFrame } from "./performance-probe";
+import { beginMeasurement, recordInteraction, sampleFrame, measurementActive, beginFrameWork, measureWork, recordLibraryRefresh } from "./performance-probe";
 import { ModelViewer } from "./model-viewer";
 import { TerminalAudio } from "./audio";
 import type {
@@ -367,12 +367,12 @@ const presentation = new MusicPresentation({
   mode: (next) => {
     mode = next;
     stage.dataset.mode = next;
-    syncSelectionMotion();
+    measureWork("menu.selectionMotion", () => syncSelectionMotion());
   },
   prepareMenu: () => {
     activeTab = "tracks";
     detailTransition.hide(true);
-    renderDetail();
+    measureWork("menu.prepare", () => renderDetail());
     const content = $("#album-detail-content");
     content.style.removeProperty("opacity");
     content.style.removeProperty("transform");
@@ -381,12 +381,14 @@ const presentation = new MusicPresentation({
   },
   showMenu: () => {
     const detail = $("#music-detail"), content = $("#album-detail-content");
-    detailTransition.show(preferences.reduced);
-    detail.inert = !!panel;
-    detail.setAttribute("aria-hidden", "false");
-    content.inert = false;
-    content.scrollTop = 0;
-    documentDecryption.reset(content, preferences.reduced);
+    measureWork("menu.transition", () => detailTransition.show(preferences.reduced));
+    measureWork("menu.visibility", () => {
+      detail.inert = !!panel;
+      detail.setAttribute("aria-hidden", "false");
+      content.inert = false;
+    });
+    measureWork("menu.scrollReset", () => { content.scrollTop = 0; });
+    measureWork("menu.mask", () => documentDecryption.reset(content, preferences.reduced));
     pendingDetailFocus = true;
   },
   hideMenu: (done) => {
@@ -521,9 +523,11 @@ async function receiveLibrary(next: MusicLibrary, force = false) {
   const scanFailed = libraryReceived && previousScan.running && !next.scan.running && !!next.scan.error;
   libraryReceived = true;
   const previousIntroductionRun = library.introductions;
+  const comparisonStart = measurementActive() ? performance.now() : 0;
   const changed =
     JSON.stringify(next.albums) !== JSON.stringify(library.albums) ||
     JSON.stringify(next.genres) !== JSON.stringify(library.genres);
+  if (measurementActive()) recordLibraryRefresh(performance.now() - comparisonStart, changed, next.albums.length);
   library = next;
   if (library.introductions?.running) introductionRequestError = "";
   if (changed || force) await applyLibrary();
@@ -860,18 +864,20 @@ function renderDetail() {
     sameAlbum = detailIdentity === a.id,
     scroll = sameAlbum ? article.scrollTop : 0;
   detailIdentity = a.id;
+  measureWork("menu.html", () => {
   article.innerHTML = `<div class="detail-overline"><span>${isApplePlaylist(a) ? "PLAYLIST" : "ALBUM"} ${String(selected + 1).padStart(3, "0")}</span><div class="detail-album-navigation" role="group" aria-label="切换专辑"><button data-action="prev" aria-label="上一张专辑">↑ 上一张</button><button data-action="next" aria-label="下一张专辑">下一张 ↓</button></div></div>
     <h1 title="${esc(a.title)}">${albumTitleMarkup(a.title)}</h1><p class="detail-artist">${esc(a.artist)}${!apple && a.offline ? '<span class="offline-badge">目录离线</span>' : ""}</p>
     <div class="album-facts">${fields.map(([name, value]) => `<div><small>${name}</small><span>${esc(String(value))}</span></div>`).join("")}</div>
     <div class="music-tabs" role="tablist" aria-label="专辑信息"><button role="tab" id="tab-tracks" data-tab="tracks" tabindex="${activeTab === "tracks" ? 0 : -1}" aria-selected="${activeTab === "tracks"}" aria-controls="album-tab-content"><span>01</span> ${apple && !isApplePlaylist(a) ? "曲目" : "歌单"}</button><button role="tab" id="tab-about" data-tab="about" tabindex="${activeTab === "about" ? 0 : -1}" aria-selected="${activeTab === "about"}" aria-controls="album-tab-content"><span>02</span> ${isApplePlaylist(a) ? "歌单信息" : "专辑介绍"}</button><i class="music-tab-indicator" aria-hidden="true"></i></div>
     <div id="album-tab-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === "tracks" ? trackList(a, discs) : albumAbout(a)}</div>`;
-  article.scrollTop = scroll;
-  syncTabIndicator(false);
-  documentDecryption.reset(
+  });
+  measureWork("menu.prepareScroll", () => { article.scrollTop = scroll; });
+  measureWork("menu.tabLayout", () => syncTabIndicator(false));
+  measureWork("menu.prepareMask", () => documentDecryption.reset(
     article,
     preferences.reduced || scene?.decryptionFrame.phase === "clear",
-  );
-  updatePlayingRows();
+  ));
+  measureWork("menu.playingRows", () => updatePlayingRows());
 }
 function trackList(a: MusicAlbum, discs: number) {
   const apple = a.source === "apple";
@@ -1701,25 +1707,26 @@ document.addEventListener("keydown", (e) => {
 let lastFrame = 0,
   frameCount = 0;
 function frame(ms: number) {
+  beginFrameWork();
   const cpuStart = performance.now();
   if (!document.hidden && scene) {
-    const opening = boot?.update(ms / 1000);
-    if (!viewer?.isOpen) scene.update(ms / 1000, opening?.cinema);
-    viewer?.update(ms / 1000);
-    if (!viewer?.isOpen && !boot?.active) presentation.update();
+    const opening = measureWork("boot", () => boot?.update(ms / 1000));
+    if (!viewer?.isOpen) measureWork("scene", () => scene!.update(ms / 1000, opening?.cinema));
+    measureWork("viewer", () => viewer?.update(ms / 1000));
+    if (!viewer?.isOpen && !boot?.active) measureWork("presentation", () => presentation.update());
     const phase = presentation.phase;
     if (stage.dataset.presentation !== phase) stage.dataset.presentation = phase;
     const cameraPhase = scene.musicPresentationPhase;
     if (stage.dataset.cameraPhase !== cameraPhase) stage.dataset.cameraPhase = cameraPhase;
     if (presentation.phase === "detail") {
-      documentDecryption.update(
+      measureWork("menu.maskAnimation", () => documentDecryption.update(
         ms / 1000,
-        scene.decryptionFrame,
+        scene!.decryptionFrame,
         preferences.reduced,
         !viewer?.isOpen,
-      );
+      ));
       if (pendingDetailFocus && !panel && !viewer?.isOpen) {
-        $("#album-detail-content").focus({ preventScroll: true });
+        measureWork("menu.focus", () => $("#album-detail-content").focus({ preventScroll: true }));
         pendingDetailFocus = false;
       }
       if (pendingTrackReveal && !panel && !viewer?.isOpen &&
@@ -1762,6 +1769,22 @@ function frame(ms: number) {
 let stressPending = false;
 window.addEventListener("keydown", (event) => {
   if (!event.ctrlKey || !event.altKey || !scene || !ready) return;
+  if (import.meta.env.VITE_FRAME_PROFILE_QA === "1" && event.code === "KeyY") {
+    event.preventDefault();
+    if (measurementActive() || stressPending || !isNative ||
+      albums.length !== 16 || !albums.every(a => /^QA \d{2} /.test(a.title))) return;
+    try { void nativeInvoke("save_benchmark", {report:scene.validateFrameCandidate()}); }
+    catch (error) { notify(String(error)); }
+    return;
+  }
+  if (import.meta.env.VITE_FRAME_PROFILE_QA === "1" && ["KeyC", "KeyD"].includes(event.code)) {
+    event.preventDefault();
+    if (measurementActive() || stressPending) return;
+    if (event.code === "KeyC") scene.preciseCullingEnabled = !scene.preciseCullingEnabled;
+    else scene.opaqueDepthPrepassEnabled = !scene.opaqueDepthPrepassEnabled;
+    notify(`渲染诊断：精确边界 ${scene.preciseCullingEnabled ? "开" : "关"} / 深度预绘 ${scene.opaqueDepthPrepassEnabled ? "开" : "关"}`);
+    return;
+  }
   if(event.code === "KeyH" && scene.nativeMetal.stats.active) {event.preventDefault();void nativeInvoke("metal_profile_slow");notify("捕获下一张 GPU 长帧；本轮仅作诊断");return;}
   if(event.code === "KeyR") {event.preventDefault();scene.benchmarkDevicePixelRatio=scene.benchmarkDevicePixelRatio?undefined:2;scene.resize();notify(`Retina 负载对照：${scene.benchmarkDevicePixelRatio ? "开启" : "关闭"}`);return;}
   if(event.code === "KeyT") {event.preventDefault();scene.transmissionDepthEnabled=!scene.transmissionDepthEnabled;notify(`透射深度预计算：${scene.transmissionDepthEnabled ? "开启" : "关闭"}`);return;}

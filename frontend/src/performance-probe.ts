@@ -1,6 +1,28 @@
 import type { ArchiveScene } from "./scene";
 import { isNative, nativeInvoke } from "./native";
+type WorkSpan = { name: string; atMs: number; cpuMs: number };
+let frameSpans: WorkSpan[] | undefined;
+
+export function beginFrameWork() { frameSpans = active ? [] : undefined; }
+/** Synchronous inclusive CPU time; nested spans must not be added together. */
+export function measureWork<T>(name: string, work: () => T): T {
+  if (!active) return work();
+  const run = active;
+  const start = performance.now();
+  try { return work(); }
+  finally {
+    const span = { name, atMs: start - run.start, cpuMs: performance.now() - start };
+    if (frameSpans) frameSpans.push(span);
+    else run.betweenFrameWork.push(span);
+  }
+}
+
 type Sample = {
+  appWork?: WorkSpan[];
+  // RAF timestamp relative to the run; work belongs to this callback, whereas
+  // interval spans the preceding callback. Do not correlate them as one GPU frame.
+  atMs: number;
+  work?: ArchiveScene['frameWork'];
   interval: number;
   cpu: number;
   calls: number;
@@ -22,6 +44,10 @@ type Input = {
 let active:
   | {
       label: string;
+      scene?: ArchiveScene;
+      startingCounters?: ReturnType<ArchiveScene['measurementCounters']>;
+      betweenFrameWork: WorkSpan[];
+      libraryRefreshes: { atMs: number; comparisonCpuMs: number; changed: boolean; albums: number }[];
       start: number;
       until: number;
       previous: number;
@@ -59,6 +85,10 @@ export function beginMeasurement(
   const now = performance.now();
   active = {
     label,
+    scene,
+    startingCounters: scene?.measurementCounters(),
+    libraryRefreshes: [],
+    betweenFrameWork: [],
     start: now,
     until: now + seconds * 1000,
     previous: 0,
@@ -73,8 +103,13 @@ export function beginMeasurement(
     nativeFrames: [],
     maxPending: 0,
   };
+  if (scene) scene.measureFrame = true;
   document.documentElement.dataset.measurement = label;
   return true;
+}
+export function measurementActive() { return active !== undefined; }
+export function recordLibraryRefresh(comparisonCpuMs: number, changed: boolean, albums: number) {
+  if (active) active.libraryRefreshes.push({ atMs: performance.now() - active.start, comparisonCpuMs, changed, albums });
 }
 export function recordNativeCompletion(issuedAt:number,completedAt:number,gpuMs:number,cpuMs:number) {
   if(!active)return;
@@ -109,6 +144,7 @@ export function sampleFrame(
 ) {
   if (!active) return;
   if (document.hidden) {
+    frameSpans = undefined;
     active.interrupted = true;
     if(!active.interruptions.includes("hidden")) active.interruptions.push("hidden");
     active.previous = 0;
@@ -129,6 +165,9 @@ export function sampleFrame(
   }
   if (active.previous)
     active.samples.push({
+      appWork: frameSpans,
+      atMs: now - active.start,
+      work: scene.frameWork?.frameTime === now / 1000 ? scene.frameWork : undefined,
       interval: now - active.previous,
       cpu,
       calls: scene.renderer.info.render.calls,
@@ -136,6 +175,7 @@ export function sampleFrame(
       width: scene.renderer.domElement.width,
       height: scene.renderer.domElement.height,
     });
+  frameSpans = undefined;
   active.previous = now;
   if (active.inputs.length) {
     const submitted = performance.now(),
@@ -157,6 +197,7 @@ export function sampleFrame(
   if (now < active.until) return;
   const m = active;
   active = undefined;
+  if (m.scene) m.scene.measureFrame = false;
   const intervals = m.samples.map((s) => s.interval),
     cpus = m.samples.map((s) => s.cpu);
   const total = intervals.reduce((a, b) => a + b, 0);
@@ -182,7 +223,7 @@ export function sampleFrame(
       ? undefined
       : "Window hidden, display changed, or frame callbacks suspended; do not compare this run.",
     optimization:
-      "v6: bounded painted-cover cache; Metal tile resolve fusion and whole-scene back-surface depth rejection; original quality",
+      "frame-profile: original quality; precise instance bounds and opaque depth prepass recorded as independent flags",
     label: m.label,
     measuredAt: new Date().toISOString(),
     runtime: isNative ? "Tauri / macOS WKWebView" : "browser",
@@ -208,6 +249,11 @@ export function sampleFrame(
       0.5,
     ),
     gpuMs: null,
+    startingCounters: m.startingCounters,
+    libraryRefreshes: m.libraryRefreshes,
+    betweenFrameWork: m.betweenFrameWork,
+    appWorkTimingNote: "Inclusive synchronous CPU spans; nested spans overlap and must not be summed. appWork starts in the callback at atMs, whereas interval measures the preceding RAF gap. No GPU barriers. Between-frame work is listed separately.",
+    workTimingNote: "Opt-in CPU wall-clock phases, without GPU barriers: update includes instance capture; atlasUpload measures atlas submission only, while selected-cover uploads can occur inside renderSubmission. resolution includes policy/resize. Work belongs to atMs; RAF interval ends at that callback. Neither is GPU execution or presentation. Cover counters are cumulative and exclude GPU upload byte accounting for full-size selected covers.",
     sceneStats: scene.getStats(),
     nativeMetal: {...scene.nativeMetal.stats,frames:m.nativeFrames,
       completedFps:m.nativeFrames.length>1 ? 1000*(m.nativeFrames.length-1)/(m.nativeFrames.at(-1)!.completedAt-m.nativeFrames[0].completedAt):null,
@@ -215,6 +261,8 @@ export function sampleFrame(
       cpuMs:m.nativeFrames.length?summary(m.nativeFrames.map(f=>f.cpuMs)):null},
     postFusionEnabled: scene.postFusionEnabled,
     transmissionDepthEnabled: scene.transmissionDepthEnabled,
+    opaqueDepthPrepassEnabled: scene.opaqueDepthPrepassEnabled,
+    preciseCullingEnabled: scene.preciseCullingEnabled,
     benchmarkDevicePixelRatio: scene.benchmarkDevicePixelRatio ?? null,
     interactions: m.inputs.length
       ? {

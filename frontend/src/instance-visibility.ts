@@ -1,5 +1,32 @@
 import * as THREE from "three";
 
+/** A plane's support radius for an affine-transformed local box. Unlike a
+ * bounding sphere, this remains tight for the thin, wide cassette geometry.
+ * Reject only if all eight corners lie strictly outside the same plane. */
+export function intersectsTransformedBox(
+  frustum: THREE.Frustum, box: THREE.Box3, matrix: THREE.Matrix4,
+) {
+  const e = matrix.elements;
+  const cx = (box.min.x + box.max.x) * 0.5;
+  const cy = (box.min.y + box.max.y) * 0.5;
+  const cz = (box.min.z + box.max.z) * 0.5;
+  const hx = (box.max.x - box.min.x) * 0.5;
+  const hy = (box.max.y - box.min.y) * 0.5;
+  const hz = (box.max.z - box.min.z) * 0.5;
+  const x = e[0]*cx + e[4]*cy + e[8]*cz + e[12];
+  const y = e[1]*cx + e[5]*cy + e[9]*cz + e[13];
+  const z = e[2]*cx + e[6]*cy + e[10]*cz + e[14];
+  for (const plane of frustum.planes) {
+    const n = plane.normal;
+    const radius = hx * Math.abs(n.x*e[0] + n.y*e[1] + n.z*e[2])
+      + hy * Math.abs(n.x*e[4] + n.y*e[5] + n.z*e[6])
+      + hz * Math.abs(n.x*e[8] + n.y*e[9] + n.z*e[10]);
+    // Retain tangent boxes, with a small margin for floating point roundoff.
+    if (n.x*x + n.y*y + n.z*z + plane.constant + radius < -1e-6) return false;
+  }
+  return true;
+}
+
 type Saved = {
   mesh: THREE.InstancedMesh;
   count: number;
@@ -56,6 +83,7 @@ export class InstanceVisibility {
         attributes.push({ attribute, values });
       }
       mesh.geometry.boundingSphere ?? mesh.geometry.computeBoundingSphere();
+      mesh.geometry.boundingBox ?? mesh.geometry.computeBoundingBox();
       return { mesh, count: mesh.count, matrix, attributes };
     });
   }
@@ -63,6 +91,7 @@ export class InstanceVisibility {
     camera: THREE.Camera,
     shadow: THREE.Frustum | undefined,
     enabled: boolean,
+    precise = false,
   ) {
     this.restore();
     this.stats = { submitted: 0, total: 0 };
@@ -79,6 +108,13 @@ export class InstanceVisibility {
         this.stats.submitted += s.count;
         continue;
       }
+      const materials = Array.isArray(s.mesh.material) ? s.mesh.material : [s.mesh.material];
+      // Unsupported deformation keeps the existing sphere path.
+      const box = precise && !s.mesh.geometry.morphAttributes.position?.length
+        && materials.every(m => !("displacementMap" in m) || !m.displacementMap)
+        ? s.mesh.geometry.boundingBox : null;
+      const intersects = (frustum: THREE.Frustum) => frustum.intersectsSphere(this.sphere)
+        && (!box || intersectsTransformedBox(frustum, box, this.transform));
       const visible: { slot: number; depth: number }[] = [];
       for (let i = 0; i < s.count; i++) {
         this.transform.fromArray(s.matrix, i * 16);
@@ -94,8 +130,8 @@ export class InstanceVisibility {
           .copy(s.mesh.geometry.boundingSphere!)
           .applyMatrix4(this.transform);
         if (
-          !this.view.intersectsSphere(this.sphere) &&
-          !(s.mesh.castShadow && shadow?.intersectsSphere(this.sphere))
+          !intersects(this.view) &&
+          !(s.mesh.castShadow && shadow && intersects(shadow))
         )
           continue;
         const view = camera.matrixWorldInverse.elements,
@@ -108,9 +144,6 @@ export class InstanceVisibility {
       // Opaque/transmissive shells write depth. Submit nearer instances first,
       // letting early depth rejection skip the hidden PBR fragments. Retain
       // original order for alpha-blended materials, where order affects colour.
-      const materials = Array.isArray(s.mesh.material)
-        ? s.mesh.material
-        : [s.mesh.material];
       if (
         materials.every(
           (material) => !material.transparent && material.depthWrite,
