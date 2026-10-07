@@ -1045,7 +1045,9 @@ player.subscribe((state) => {
   $("#play-pause").title = state.currentTrack
     ? `${state.playing ? "暂停" : "播放"}：${state.currentTrack.title}`
     : "播放当前专辑";
-  if (state.error && state.error !== lastPlayerError) notify(state.currentTrack ? `「${state.currentTrack.title}」：${state.error}` : state.error);
+  // A command failure can arrive before its playback snapshot. Do not attribute
+  // it to currentTrack, which may still describe the previous successful song.
+  if (state.error && state.error !== lastPlayerError) notify(state.error);
   lastPlayerError = state.error || "";
   updatePlayingRows();
 });

@@ -94,6 +94,20 @@ func appleReleaseYear(_ date: Date?) -> Int? {
     return calendar.component(.year, from: date)
 }
 
+// The queue omits unsupported media, but library occurrences keep their original positions.
+func appleAudioQueuePlan(_ supported: [Bool], selected: Int) throws -> (indices: [Int], selected: Int) {
+    guard supported.indices.contains(selected), supported[selected] else { throw failure("暂不支持此类型的资料库条目") }
+    let indices = supported.indices.filter { supported[$0] }
+    return (indices, indices.firstIndex(of: selected)!)
+}
+@MainActor func startVerifiedAppleQueue(prepare: () async throws -> Void,
+    canStart: () -> Bool, verify: () throws -> Void, play: () async throws -> Void) async throws {
+    try await prepare()
+    guard canStart() else { throw failure("播放操作已取消") }
+    try verify()
+    try await play()
+}
+
 @available(macOS 14.0, *)
 @MainActor private final class AppleBridge {
     static let shared = AppleBridge()
@@ -112,6 +126,35 @@ func appleReleaseYear(_ date: Date?) -> Int? {
     var queue: [Item] = []
     var runtimeIDs: [String] = []
     var lastIndex = 0
+    var originalIndices: [Int] = []
+
+    func verifyQueue() throws {
+        let observed = Array(player.queue.entries)
+        guard observed.count == queue.count,
+            Set(observed.map(\.id)).count == observed.count,
+            zip(observed, queue).allSatisfy({ $0.title == ($1.json["title"] as? String) }) else { throw failure("原生队列身份无法核对") }
+        let ids = observed.map(\.id)
+        guard let current = player.queue.currentEntry, ids.firstIndex(of: current.id) == lastIndex else {
+            throw failure("原生播放器未定位到所选资料库条目")
+        }
+        runtimeIDs = ids
+    }
+    // play() can finish before its native state notification. On failure, wait
+    // through the observed late transition instead of acknowledging one stale pause.
+    func stopFailedOperation(_ ticket: UInt64) async throws {
+        let deadline = Date().addingTimeInterval(15)
+        var quietSince: Date? = nil
+        while true {
+            guard ticket == generation else { return }
+            player.stop()
+            let now = Date()
+            if player.state.playbackStatus == .playing { quietSince = nil }
+            else if let quietSince, now.timeIntervalSince(quietSince) >= 0.25 { return }
+            else if quietSince == nil { quietSince = now }
+            guard now < deadline else { throw failure("Apple Music 尚未确认停止") }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
 
     func authorization() -> String { MusicAuthorization.currentStatus.rawValue }
     func checkAuthorization() throws {
@@ -290,6 +333,11 @@ func appleReleaseYear(_ date: Date?) -> Int? {
         else if operation == "play" { intent = "playing" }
         try await waitForOperations()
         guard ticket == generation else { throw failure("播放操作已被后续命令替代") }
+        if operation != "play" && (runtimeIDs.isEmpty || player.queue.currentEntry.map { !runtimeIDs.contains($0.id) } ?? true) {
+            intent = "idle"; runtimeIDs = []
+            try await stopFailedOperation(ticket)
+            throw failure("播放队列尚未核对，请重新点播歌曲")
+        }
         if operation == "play" {
             guard let ids = body["ids"] as? [String], let selected = body["id"] as? String,
                   ids.filter({ $0 == selected }).count == 1, let index = ids.firstIndex(of: selected), !ids.isEmpty else {
@@ -301,20 +349,24 @@ func appleReleaseYear(_ date: Date?) -> Int? {
                 guard let item = items[id] else { throw failure("资料库条目已变化，请重新同步后点播") }
                 return item
             }
-            guard requested[index].supported else { throw failure("暂不支持此类型的资料库条目") }
+            let plan = try appleAudioQueuePlan(requested.map(\.supported), selected: index)
             let selectedNativeID = requested[index].track.id
             guard requested.filter({ $0.track.id == selectedNativeID }).count == 1 else {
                 throw failure("此歌曲在当前队列重复出现，暂无法唯一定位所选位置")
             }
-            queue = requested; runtimeIDs = []; lastIndex = index; queueGeneration += 1
-            let tracks = requested.map(\.track)
-            player.queue = ApplicationMusicPlayer.Queue(for: tracks, startingAt: tracks[index])
+            originalIndices = plan.indices
+            queue = plan.indices.map { requested[$0] }; runtimeIDs = []; lastIndex = plan.selected; queueGeneration += 1
+            let tracks = queue.map(\.track)
+            player.queue = ApplicationMusicPlayer.Queue(for: tracks, startingAt: tracks[lastIndex])
         }
         inFlight += 1
         defer { inFlight -= 1; settle() }
         do {
             switch operation {
-            case "play": try await player.play()
+            case "play":
+                try await startVerifiedAppleQueue(prepare: { try await self.player.prepareToPlay() },
+                    canStart: { ticket == self.generation && self.intent == "playing" },
+                    verify: { try self.verifyQueue() }, play: { try await self.player.play() })
             case "toggle":
                 if intent == "paused" { player.pause() } else if !queue.isEmpty { try await player.play() }
             case "next": try await player.skipToNextEntry()
@@ -325,14 +377,7 @@ func appleReleaseYear(_ date: Date?) -> Int? {
             default: throw failure("不支持的 Apple 播放操作")
             }
             if intent != "idle" && operation == "play" {
-                let observed = Array(player.queue.entries)
-                guard observed.count == queue.count,
-                    zip(observed, queue).allSatisfy({ $0.title == ($1.json["title"] as? String) }),
-                    Set(observed.map(\.id)).count == observed.count else { throw failure("原生队列身份无法核对") }
-                runtimeIDs = observed.map(\.id)
-                guard let current = player.queue.currentEntry, runtimeIDs.firstIndex(of: current.id) == lastIndex else {
-                    throw failure("原生播放器未定位到所选资料库条目")
-                }
+                try verifyQueue()
             }
             if ticket == generation && intent == "playing" && (operation == "play" || operation == "toggle") {
                 let deadline = Date().addingTimeInterval(15)
@@ -342,7 +387,10 @@ func appleReleaseYear(_ date: Date?) -> Int? {
                 }
             }
         } catch {
-            if ticket == generation { intent = "idle"; player.stop() }
+            if ticket == generation {
+                intent = "idle"; runtimeIDs = []
+                try await stopFailedOperation(ticket)
+            }
             throw error
         }
     }
@@ -350,14 +398,19 @@ func appleReleaseYear(_ date: Date?) -> Int? {
         let raw = player.state.playbackStatus
         if let current = player.queue.currentEntry, let index = runtimeIDs.firstIndex(of: current.id) { lastIndex = index }
         // Observe external media-key changes. Do not continuously enforce Pause.
-        if inFlight == 0 && stopping == 0 && !queue.isEmpty {
+        let mapped = player.queue.currentEntry.map { runtimeIDs.contains($0.id) } ?? false
+        if inFlight == 0 && stopping == 0 && !queue.isEmpty && !mapped && raw == .playing {
+            // An unverified or failed queue must never become valid via a later state poll.
+            intent = "idle"; player.stop()
+        }
+        if inFlight == 0 && stopping == 0 && mapped {
             if raw == .playing { intent = "playing" }
             else if intent == "playing" && raw == .paused { intent = "paused" }
             else if raw == .stopped { intent = "idle" }
         }
-        return ["playing": raw == .playing, "elapsed": intent == "idle" ? 0 : player.playbackTime,
-            "transport": intent, "currentIndex": lastIndex, "queueGeneration": queueGeneration,
-            "track": queue.indices.contains(lastIndex) ? queue[lastIndex].json : NSNull(),
+        return ["playing": mapped && intent == "playing" && raw == .playing, "elapsed": intent == "idle" || !mapped ? 0 : player.playbackTime,
+            "transport": intent, "currentIndex": originalIndices.indices.contains(lastIndex) ? originalIndices[lastIndex] : lastIndex, "queueGeneration": queueGeneration,
+            "track": !runtimeIDs.isEmpty && queue.indices.contains(lastIndex) ? queue[lastIndex].json : NSNull(),
             "nativeState": String(describing: raw), "pendingOperations": inFlight]
     }
     func request(_ op: String, _ body: [String: Any]) async throws -> Any {
