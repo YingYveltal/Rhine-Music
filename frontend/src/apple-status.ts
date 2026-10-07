@@ -4,6 +4,7 @@ export interface AppleStatus {
   enabled: boolean;
   playlistCount: number;
   trackCount: number;
+  unconfirmedPlaylistCount?: number;
   updatedAt: string | null;
   unavailableReason?: string | null;
   job: { running: boolean; completed: number; total: number; message: string | null; error: string | null };
@@ -26,6 +27,9 @@ export function appleStatusText(s: AppleStatus) {
     const date = new Date(s.updatedAt);
     if (Number.isFinite(date.getTime())) lines.push(`上次同步：${date.toLocaleString('zh-CN')}`);
   } else if (s.authorization === 'authorized') lines.push('尚未同步歌单，请点击“同步我的歌单”。');
+  if (!s.job.running && s.unconfirmedPlaylistCount) {
+    lines.push(`其中 ${s.unconfirmedPlaylistCount} 个歌单本次未读取到歌曲。若本来为空可忽略；若已有歌曲，请稍后重新同步。`);
+  }
   return lines.join('\n');
 }
 

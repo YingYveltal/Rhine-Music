@@ -34,3 +34,14 @@ test('unsupported systems and a running sync cannot offer unauthorized actions',
   assert.match(appleStatusText(running), /读取歌单（2\/5）/);
   assert.equal(applePanelControls(running, false).sync, false);
 });
+
+test('unconfirmed empty playlists remain visible without claiming a complete sync', () => {
+  const s = { ...status, authorization: 'authorized', playlistCount: 2, trackCount: 3,
+    unconfirmedPlaylistCount: 1, updatedAt: '2026-10-07T01:00:00Z' };
+  const text = appleStatusText(s);
+  assert.match(text, /已保存 2 个歌单，3 个曲目/);
+  assert.match(text, /1 个歌单本次未读取到歌曲/);
+  assert.match(text, /本来为空可忽略.*已有歌曲.*稍后重新同步/);
+  assert.doesNotMatch(text, /完整同步成功|读取错误|已有歌单保留/);
+  assert.equal(applePanelControls(s, false).sync, true);
+});
