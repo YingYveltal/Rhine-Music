@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="title desc">
+  <title id="title">Rhine Music — your music, one glass archive</title>
+  <desc id="desc">A brand illustration of three translucent record sleeves with abstract sun, moon and mountain artwork. This is not a screenshot of the application.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#13242d"/><stop offset="1" stop-color="#070e19"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d8e4e8" stop-opacity=".25"/><stop offset=".5" stop-color="#90a5b5" stop-opacity=".04"/><stop offset="1" stop-color="#d8e4e8" stop-opacity=".17"/></linearGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e7d7b5"/><stop offset="1" stop-color="#bd8259"/></linearGradient>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#263b57"/><stop offset="1" stop-color="#0c1929"/></linearGradient>
+    <linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b7c9c6"/><stop offset="1" stop-color="#496e78"/></linearGradient>
+    <radialGradient id="light"><stop stop-color="#eed7ab" stop-opacity=".10"/><stop offset="1" stop-color="#eed7ab" stop-opacity="0"/></radialGradient>
+    <clipPath id="edge"><rect x="1" y="1" width="1278" height="398" rx="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#edge)">
+    <rect width="1280" height="400" fill="url(#bg)"/>
+    <ellipse cx="800" cy="0" rx="700" ry="400" fill="url(#light)"/>
+    <g fill="none" stroke="#d2e2e7" stroke-opacity=".07">
+      <path d="M0 336H1280M0 356H1280M0 380H1280"/>
+      <path d="M620 0L800 400M765 0L945 400M910 0L1090 400M1055 0L1235 400"/>
+    </g>
+    <g font-family="Arial, Helvetica, sans-serif">
+      <path d="M64 58h28" stroke="#dcc59d" stroke-width="3"/>
+      <text x="104" y="63" font-size="13" letter-spacing="3" fill="#c1cdd1">MUSIC ARCHIVE</text>
+      <text x="60" y="167" font-size="76" font-weight="700" letter-spacing="-3" fill="#f1f1e9">Rhine Music</text>
+      <text x="64" y="213" font-size="21" letter-spacing="1" fill="#b5c3c9">Your music. One glass archive.</text>
+      <path d="M64 256h478" stroke="#c4d0d6" stroke-opacity=".23"/>
+      <text x="64" y="289" font-size="13" letter-spacing="1.5" fill="#dec9a7">LOCAL</text>
+      <text x="148" y="289" font-size="13" fill="#70838d">/</text>
+      <text x="174" y="289" font-size="13" letter-spacing="1.5" fill="#c1cdd1">QQ MUSIC</text>
+      <text x="290" y="289" font-size="13" fill="#70838d">/</text>
+      <text x="316" y="289" font-size="13" letter-spacing="1.5" fill="#c1cdd1">APPLE MUSIC</text>
+      <text x="64" y="360" font-size="11" letter-spacing="2" fill="#81949e">macOS  /  PREVIEW</text>
+    </g>
+    <g transform="translate(976 64) rotate(13 112 136)">
+      <rect x="0" y="0" width="221" height="274" rx="8" fill="url(#glass)" stroke="#d2e2e7" stroke-opacity=".30"/>
+      <rect x="16" y="18" width="189" height="210" rx="2" fill="url(#mist)"/>
+      <path d="M16 164L84 108L154 165L205 133V228H16Z" fill="#65878b"/>
+      <path d="M16 212L116 145L205 200V228H16Z" fill="#345561"/>
+      <path d="M19 249h106" stroke="#c9d8de" stroke-opacity=".40" stroke-width="2"/>
+    </g>
+    <g transform="translate(834 55) rotate(3 112 136)">
+      <rect x="0" y="0" width="221" height="274" rx="8" fill="url(#glass)" stroke="#d2e2e7" stroke-opacity=".40"/>
+      <rect x="16" y="18" width="189" height="210" rx="2" fill="url(#night)"/>
+      <path d="M137 55a25 25 0 1 0 23 38a27 27 0 0 1-23-38Z" fill="#eadfc4"/>
+      <path d="M17 162H204M17 173H204M17 187H204M17 204H204" stroke="#a5b8c4" stroke-opacity=".12"/>
+      <path d="M19 249h106" stroke="#c9d8de" stroke-opacity=".45" stroke-width="2"/>
+    </g>
+    <g transform="translate(674 78) rotate(-10 112 136)">
+      <rect x="0" y="0" width="221" height="274" rx="8" fill="url(#glass)" stroke="#e4e9e6" stroke-opacity=".60"/>
+      <rect x="5" y="5" width="211" height="264" rx="5" fill="none" stroke="#e4e9e6" stroke-opacity=".16"/>
+      <rect x="16" y="18" width="189" height="210" rx="2" fill="url(#sand)"/>
+      <circle cx="118" cy="91" r="33" fill="#f1e8c9"/>
+      <path d="M16 176Q83 167 132 146Q171 129 205 150V228H16Z" fill="#bf8055"/>
+      <path d="M16 216Q101 201 157 161Q184 168 205 182V228H16Z" fill="#905b43"/>
+      <path d="M19 249h106" stroke="#e3dfd0" stroke-opacity=".65" stroke-width="2"/>
+      <circle cx="196" cy="249" r="3" fill="#dcc59d"/>
+    </g>
+    <text x="1214" y="370" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="10" letter-spacing="1.5" fill="#81949e">BRAND ILLUSTRATION</text>
+  </g>
+  <rect x=".5" y=".5" width="1279" height="399" rx="14" fill="none" stroke="#9eb4bf" stroke-opacity=".22"/>
+</svg>

@@ -1,5 +1,7 @@
 # Rhine Music Demo · V0.3.0
 
+> **上游历史文档。** 以下内容保留 RonaldDeng / Rhine-Music-Demo v0.3.0 的运行、截图及发行说明，不代表本仓库当前桌面版。下载当前 `.app` 请返回[Rhine Music 首页](../README.md)，使用方式见[Preview 说明](../docs/PREVIEW.md)。
+
 本地版本目录：V0.0.1 → V0.0.2 → V0.0.3 → V0.1.0 → V0.1.1 → V0.1.1b → V0.2.0 → V0.3.0。
 
 **把本地音乐放进三维专辑架。** 以玻璃 CD 盒浏览收藏，打开专辑、查找歌曲，并在浏览器中播放本机音乐。
