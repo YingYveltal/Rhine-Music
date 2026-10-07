@@ -245,6 +245,16 @@ mod tests {
         }
     }
     #[test]
+    fn fully_transparent_playlist_artwork_falls_back_but_opaque_solid_art_is_valid() {
+        use base64::Engine;
+        let transparent=base64::engine::general_purpose::STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4b6zEAAAE3gFVTX0OowAAAABJRU5ErkJggg==").unwrap();
+        assert!(!valid_artwork(&transparent));assert!(valid_artwork(&artwork_png()));
+        let dir=tempfile::tempdir().unwrap();
+        let mut album=json!({"artworkURL":"playlist","firstTrackArtworkURL":"first"});
+        cache_artwork(&mut album,dir.path(),|url|Ok(if url=="playlist" {transparent.clone()} else {artwork_png()}));
+        assert_eq!(album["nativeCoverPath"],json!(dir.path().join(format!("{}.img",hash("first")))));
+    }
+    #[test]
     fn artwork_cache_write_failure_is_nonfatal() {
         let dir=tempfile::tempdir().unwrap();let blocked=dir.path().join("not-a-directory");
         std::fs::write(&blocked,b"occupied").unwrap();

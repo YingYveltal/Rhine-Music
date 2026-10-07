@@ -26,8 +26,23 @@ private func traceArtwork(_ stage: String, _ artwork: Artwork?) {
 func rhineAppleArtworkValid(_ bytes: UnsafePointer<UInt8>, _ count: Int) -> UInt8 {
     let data = Data(bytes: bytes, count: count)
     guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-          CGImageSourceCreateImageAtIndex(source, 0, nil) != nil else { return 0 }
-    return 1
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return 0 }
+    guard image.width > 0, image.height > 0, image.width <= 4096, image.height <= 4096 else { return 0 }
+    switch image.alphaInfo {
+    case .none, .noneSkipFirst, .noneSkipLast: return 1
+    default: break
+    }
+    // MusicKit can return a transparent image for an artwork-less playlist.
+    // Reject only zero-alpha images, not plain but opaque artwork.
+    var alpha = [UInt8](repeating: 0, count: image.width * image.height * 4)
+    let drawn = alpha.withUnsafeMutableBytes { pixels -> Bool in
+        guard let context = CGContext(data: pixels.baseAddress, width: image.width, height: image.height,
+            bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return true
+    }
+    return drawn && stride(from: 3, to: alpha.count, by: 4).contains(where: { alpha[$0] != 0 }) ? 1 : 0
 }
 
 private func failure(_ message: String) -> NSError {
@@ -112,6 +127,10 @@ private func digest(_ fields: [String]) -> String {
             let fresh = artwork!.url(width: 600, height: 600)!
             let (data, response) = try await URLSession.shared.data(for: URLRequest(url: fresh, timeoutInterval: 12))
             artworkTrace("native-shared bytes=\(data.count) http=\((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            let visible = data.withUnsafeBytes { rhineAppleArtworkValid($0.bindMemory(to: UInt8.self).baseAddress!, data.count) }
+            let source = CGImageSourceCreateWithData(data as CFData, nil)
+            let image = source.flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+            artworkTrace("native-shared visible=\(visible) width=\(image?.width ?? 0) height=\(image?.height ?? 0)")
         } catch {
             let e = error as NSError
             artworkTrace("native-shared error-domain=\(e.domain) code=\(e.code)")
