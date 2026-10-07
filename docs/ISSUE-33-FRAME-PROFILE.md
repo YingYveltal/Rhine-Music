@@ -33,8 +33,16 @@ QA 构建 `VITE_FRAME_PROFILE_QA=1`：Ctrl+Option+C 切精确边界，D 切原�
 - CPU 测量启停、嵌套段、帧外事件、隐藏帧和旧帧排除等 5 项检查通过；像素比较顺序、阈值和异常恢复 3 项检查通过。
 - 既有 21 项交互呈现检查通过。
 
-上述均不是实际 GPU、视觉或流畅度验收。当前未启动 GUI、未构建原生包、未发布或替换现有 Preview。
+上述均不是实际 GPU、视觉或流畅度验收。当前未启动 QA、未进行新性能测量、未发布或替换现有 Preview。
 
 ## 技术路线判断
 
 继续采用 Rust 核心 + WebView/Three.js 是本轮建议，不是已证明全局最快的技术栈。已有 Metal 原型没有解决交互长尾且尚有画面差异；这不足以支持迁移。光追加速的是加速结构遍历/射线求交，需要对应渲染管线，并不是现有 WebGL 材质或 DOM 动画的通用提速开关。Apple 的 [Metal 光追指南](https://developer.apple.com/videos/play/wwdc2023/10128/)也分别讨论结构构建时间和追踪时间。本项目当前没有测得光追收益，因此本轮先减少已有管线的无用工作，而不引入另一套光照外观。
+
+## 诊断包完成，实测尚未开始
+
+源码 `08cf1fd3b3df45c90b3673eac10f0ebd434ebfd2`，`VITE_FRAME_PROFILE_QA=1`。复用既有 Cargo target，构建前确认无其他 cargo/rustc，生产前端和原生 release 构建成功；app 的 ad-hoc 签名严格检查通过。主程序 SHA-256：`cbe35425cd386cdced946ec5f9c1f31980df172637fc9b3840a5cb92b7d9a767`。包、ZIP、来源清单和构建日志留在 ignored `.local/frame-profile/diagnostic` 与其父目录，未公开发行。
+
+构建后的唯一一次正常 Preview UI 复查确认已有实际歌曲播放。按设备交接约束，没有退出/暂停用户播放器，也没有启动 QA 或执行受并行 GPU 负载影响的对照。随后总控优先安排标题栏主题与 Apple Music 播放问题，已交回 GUI/GPU/音频/重构建及共享 target。该诊断包还没有实际启动验收，不能声称改善掉帧。
+
+既有 QA 数据目录只读核对为专用 WebKit store、无 remembered QQ 连接；19 个本地集合中 16 个为编号 QA，另 3 个文件名均为工作树内 fixture-silence.wav。新一轮仍使用另行生成的 16 张编号 fixture，不把额外集合混入测量。正式启动前仍需核对本包实际运行身份和当前数据。
