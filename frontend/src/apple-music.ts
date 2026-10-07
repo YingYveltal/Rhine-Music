@@ -4,7 +4,7 @@ import './apple-music.css';
 
 export function mountApplePanel(root: HTMLElement, refresh: () => Promise<void>) {
   root.innerHTML = `<h3>Apple Music</h3><p id="apple-status" role="status">正在读取资料库访问状态…</p>
-    <div class="panel-actions"><button id="apple-authorize" disabled>允许访问音乐资料库</button><button class="primary-button" id="apple-sync" disabled>同步我的歌单</button></div>
+    <div class="panel-actions"><button id="apple-authorize" disabled>允许访问音乐资料库</button><button class="primary-button" id="apple-sync" disabled>同步我的资料库</button></div>
     <label class="settings-row"><span>在卡片架显示 Apple Music</span><input id="apple-enabled" type="checkbox" disabled></label>
     <p id="apple-feedback" role="status" aria-live="polite"></p>`;
   const el = <T extends HTMLElement = HTMLElement>(id: string) => root.querySelector<T>(`#apple-${id}`)!;
@@ -46,7 +46,7 @@ export function mountApplePanel(root: HTMLElement, refresh: () => Promise<void>)
           // status now supplies the final counts or failure, without erasing a
           // newer display-setting result or unrelated error.
           if (syncFinished) { syncFeedbackPending = false; el('feedback').textContent = ''; }
-          const stamp = JSON.stringify([s.enabled, s.updatedAt, s.playlistCount, s.trackCount, s.job.running, s.job.error]);
+          const stamp = JSON.stringify([s.enabled, s.updatedAt, s.playlistCount, s.albumCount, s.trackCount, s.unconfirmedPlaylistCount, s.unconfirmedAlbumCount, s.job.running, s.job.error]);
           const changed = libraryStamp !== undefined && stamp !== libraryStamp;
           libraryStamp = stamp;
           if (changed && !s.job.running) await refresh();
@@ -74,7 +74,7 @@ export function mountApplePanel(root: HTMLElement, refresh: () => Promise<void>)
       if (alive()) {
         syncFeedbackPending = operation === 'sync' && s.job.running;
         el('feedback').textContent = syncFeedbackPending
-          ? '正在同步歌单，可以关闭此面板继续浏览。'
+          ? '正在同步资料库，可以关闭此面板继续浏览。'
           : operation === 'enable' ? '显示设置已保存。' : '';
       }
     } catch (error) {

@@ -50,6 +50,50 @@ func retryEmptyPlaylistRead<Entry, Item>(
     return result
 }
 
+// Pagination is atomic: a missing promised page never becomes a partial success.
+func readApplePages<T>(initial: [T], hasNext: Bool,
+    next: () async throws -> (items: [T], hasNext: Bool)?) async throws -> [T] {
+    var result = initial, more = hasNext
+    while more {
+        guard let page = try await next(), !page.items.isEmpty else {
+            throw failure("Apple Music 分页未完成，已保留上次完整曲库")
+        }
+        result.append(contentsOf: page.items); more = page.hasNext
+    }
+    return result
+}
+
+func retryEmptyAlbumRead<T>(read: () async throws -> [T], reread: () async throws -> [T]) async throws -> [T] {
+    let tracks = try await read()
+    return tracks.isEmpty ? try await reread() : tracks
+}
+
+struct AppleAlbumTrackIdentity {
+    let id: String
+    let disc: Int?
+    let number: Int?
+}
+// Missing numbering cannot establish a different order. Keep the source order
+// in that case; otherwise sort by the real disc/track pair, stably on ties.
+func appleAlbumOrder(_ tracks: [AppleAlbumTrackIdentity]) -> [Int] {
+    let indices = Array(tracks.indices)
+    guard tracks.allSatisfy({ ($0.disc ?? 0) > 0 && ($0.number ?? 0) > 0 }) else { return indices }
+    return indices.sorted {
+        let a = tracks[$0], b = tracks[$1]
+        return (a.disc!, a.number!, $0) < (b.disc!, b.number!, $1)
+    }
+}
+func appleAlbumIdentity(_ libraryID: String, _ tracks: [AppleAlbumTrackIdentity]) -> (id: String, revision: String, occurrences: [String]) {
+    let id = "apple-album-" + digest([libraryID])
+    let revision = digest(tracks.enumerated().map { "\($0.offset):\($0.element.id):\($0.element.disc.map(String.init) ?? ""):\($0.element.number.map(String.init) ?? "")" })
+    return (id, revision, tracks.enumerated().map { "apple-track-album-" + digest([id, revision, $0.element.id, String($0.offset)]) })
+}
+func appleReleaseYear(_ date: Date?) -> Int? {
+    guard let date else { return nil }
+    var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    return calendar.component(.year, from: date)
+}
+
 @available(macOS 14.0, *)
 @MainActor private final class AppleBridge {
     static let shared = AppleBridge()
@@ -74,15 +118,14 @@ func retryEmptyPlaylistRead<Entry, Item>(
         guard MusicAuthorization.currentStatus == .authorized else { throw failure("请先允许 Rhine 访问音乐资料库") }
     }
     func all<T: MusicItem>(_ initial: MusicItemCollection<T>) async throws -> [T] {
-        var batch = initial, result = Array(initial)
-        while batch.hasNextBatch {
-            guard let next = try await batch.nextBatch(limit: 100), !next.isEmpty else {
-                throw failure("Apple Music 分页未完成，已保留上次完整曲库")
-            }
-            result.append(contentsOf: next); batch = next
+        var batch = initial
+        return try await readApplePages(initial: Array(initial), hasNext: initial.hasNextBatch) {
+            guard let next = try await batch.nextBatch(limit: 100) else { return nil }
+            batch = next
+            return (Array(next), next.hasNextBatch)
         }
-        return result
     }
+
     func artwork(_ body: [String: Any]) async throws -> [String: Any] {
         guard let raw = body["url"] as? String, let url = URL(string: raw),
               url.scheme?.lowercased() == "musickit" else { throw failure("封面地址不可用") }
@@ -101,7 +144,9 @@ func retryEmptyPlaylistRead<Entry, Item>(
         var request = MusicLibraryRequest<Playlist>(); request.limit = 100
         let response = try await request.response()
         let playlists = try await all(response.items)
-        total = playlists.count
+        var albumRequest = MusicLibraryRequest<Album>(); albumRequest.limit = 100
+        let libraryAlbums = try await all(albumRequest.response().items)
+        total = playlists.count + libraryAlbums.count
         var nextItems: [String: Item] = [:], nextAlbums: [[String: Any]] = []
         for playlist in playlists {
             let contents = try await retryEmptyPlaylistRead(read: {
@@ -158,6 +203,50 @@ func retryEmptyPlaylistRead<Entry, Item>(
             }
             nextAlbums.append(album); completed += 1
         }
+        for libraryAlbum in libraryAlbums {
+            let tracks = try await retryEmptyAlbumRead(read: {
+                let full = try await libraryAlbum.with(.tracks, preferredSource: .library)
+                guard let collection = full.tracks else { throw failure("专辑曲目暂时不可用，已保留上次完整曲库") }
+                return try await all(collection)
+            }, reread: {
+                var freshRequest = MusicLibraryRequest<Album>(); freshRequest.limit = 1
+                freshRequest.filter(matching: \.id, equalTo: libraryAlbum.id)
+                let response = try await freshRequest.response()
+                guard let fresh = response.items.first, fresh.id == libraryAlbum.id else {
+                    throw failure("专辑已变化，已保留上次完整曲库；请稍后重新同步")
+                }
+                let full = try await fresh.with(.tracks, preferredSource: .library)
+                guard let collection = full.tracks else { throw failure("专辑曲目暂时不可用，已保留上次完整曲库") }
+                return try await all(collection)
+            })
+            // The relationship is the user's library subset. Album.trackCount
+            // and isComplete can describe the release, not the owned tracks.
+            let metadata = tracks.map { AppleAlbumTrackIdentity(id: $0.id.rawValue, disc: $0.discNumber, number: $0.trackNumber) }
+            let identity = appleAlbumIdentity(libraryAlbum.id.rawValue, metadata)
+            var rows: [[String: Any]] = []
+            for i in appleAlbumOrder(metadata) {
+                let track = tracks[i], id = identity.occurrences[i]
+                var row: [String: Any] = ["id": id, "albumId": identity.id, "source": "apple", "title": track.title,
+                    "artist": track.artistName, "duration": track.duration ?? 0, "format": "Apple Music",
+                    "browserPlayable": false, "audioUrl": "", "relativePath": "",
+                    "sourcePosition": i, "snapshotRevision": identity.revision]
+                if let number = track.trackNumber, number > 0 { row["trackNumber"] = number }
+                if let disc = track.discNumber, disc > 0 { row["discNumber"] = disc }
+                let supported: Bool
+                if case .song = track { supported = true } else { supported = false }
+                rows.append(row); nextItems[id] = Item(track: track, json: row, supported: supported)
+            }
+            var album: [String: Any] = ["id": identity.id, "source": "apple", "kind": "album",
+                "title": libraryAlbum.title, "artist": libraryAlbum.artistName, "genreId": "apple-albums",
+                "rawGenres": libraryAlbum.genreNames, "folder": "", "tracks": rows, "producers": [], "offline": false,
+                "complete": !tracks.isEmpty, "snapshotRevision": identity.revision,
+                "loadError": tracks.isEmpty ? "本次未读取到歌曲。若这本来是空专辑可忽略；若已收藏歌曲，请稍后重新同步。" as Any : NSNull()]
+            if let year = appleReleaseYear(libraryAlbum.releaseDate) { album["year"] = year }
+            if let url = libraryAlbum.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
+            if let first = tracks.first, case .song(let song) = first,
+               let url = song.artwork?.url(width: 600, height: 600) { album["firstTrackArtworkURL"] = url.absoluteString }
+            nextAlbums.append(album); completed += 1
+        }
         // Publish after all reads finish; uncertain empty relationships remain marked.
         // An active queue keeps its own objects.
         items = nextItems; albums = nextAlbums
@@ -209,10 +298,10 @@ func retryEmptyPlaylistRead<Entry, Item>(
             if ids.contains(where: { items[$0] == nil }) { _ = try await sync() }
             guard ticket == generation else { throw failure("播放操作已取消") }
             let requested = try ids.map { id -> Item in
-                guard let item = items[id] else { throw failure("歌单已变化，请重新同步后点播") }
+                guard let item = items[id] else { throw failure("资料库条目已变化，请重新同步后点播") }
                 return item
             }
-            guard requested[index].supported else { throw failure("首版暂不支持此类型的歌单条目") }
+            guard requested[index].supported else { throw failure("暂不支持此类型的资料库条目") }
             let selectedNativeID = requested[index].track.id
             guard requested.filter({ $0.track.id == selectedNativeID }).count == 1 else {
                 throw failure("此歌曲在当前队列重复出现，暂无法唯一定位所选位置")
@@ -242,7 +331,7 @@ func retryEmptyPlaylistRead<Entry, Item>(
                     Set(observed.map(\.id)).count == observed.count else { throw failure("原生队列身份无法核对") }
                 runtimeIDs = observed.map(\.id)
                 guard let current = player.queue.currentEntry, runtimeIDs.firstIndex(of: current.id) == lastIndex else {
-                    throw failure("原生播放器未定位到所选歌单条目")
+                    throw failure("原生播放器未定位到所选资料库条目")
                 }
             }
             if ticket == generation && intent == "playing" && (operation == "play" || operation == "toggle") {

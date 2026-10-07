@@ -95,8 +95,10 @@ impl Apple {
     pub fn status(&self) -> Value {
         let c = self.cache.lock().unwrap(); let mut s = c.status.clone();
         s["enabled"] = json!(c.enabled); s["updatedAt"] = json!(c.updated_at);
-        s["playlistCount"] = json!(c.albums.len());
-        s["unconfirmedPlaylistCount"] = json!(c.albums.iter().filter(|a| a["complete"] == false).count());
+        s["playlistCount"] = json!(c.albums.iter().filter(|a| a["kind"] != "album").count());
+        s["albumCount"] = json!(c.albums.iter().filter(|a| a["kind"] == "album").count());
+        s["unconfirmedPlaylistCount"] = json!(c.albums.iter().filter(|a| a["kind"] != "album" && a["complete"] == false).count());
+        s["unconfirmedAlbumCount"] = json!(c.albums.iter().filter(|a| a["kind"] == "album" && a["complete"] == false).count());
         s["trackCount"] = json!(c.albums.iter().map(|a|a["tracks"].as_array().map_or(0,Vec::len)).sum::<usize>());
         s
     }
@@ -137,7 +139,7 @@ impl Apple {
                 let mut c=self.cache.lock().unwrap();
                 c.status["authorization"]=status["authorization"].clone();
                 if c.status["job"]["running"]!=true {
-                    c.status["job"]=json!({"running":true,"completed":0,"total":0,"message":"正在读取个人歌单","error":null});
+                    c.status["job"]=json!({"running":true,"completed":0,"total":0,"message":"正在读取专辑和歌单","error":null});
                     let this=self.clone(); std::thread::spawn(move || this.sync());
                 }
             }
@@ -148,7 +150,7 @@ impl Apple {
     fn sync(&self) {
         let result=(|| -> Result<Vec<Value>> {
             let value=receive(self.native.call("sync",json!({})))?;
-            let mut albums=value.as_array().context("歌单响应格式错误")?.clone();
+            let mut albums=value.as_array().context("资料库响应格式错误")?.clone();
             let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12)).build()?;
             for album in &mut albums {
                 cache_artwork(album, &self.cover_root(), |url| {
@@ -317,6 +319,30 @@ mod tests {
         assert_eq!(reopened.albums()[0]["tracks"][1]["id"],"entry-2");
         assert_eq!(reopened.status()["trackCount"],2);
         assert_eq!(reopened.status()["enabled"],true);
+    }
+    #[test]
+    fn mixed_library_counts_metadata_and_failure_preservation() {
+        let dir=tempfile::tempdir().unwrap();let mut apple=Apple::new(dir.path()).unwrap();
+        let this=Arc::get_mut(&mut apple).unwrap();
+        let collections=json!([
+            {"id":"legacy-playlist","tracks":[{"id":"old-entry"}]},
+            {"id":"empty-playlist","kind":"playlist","complete":false,"tracks":[]},
+            {"id":"apple-album-one","kind":"album","complete":true,"year":2000,"tracks":[
+                {"id":"apple-track-album-a","discNumber":1,"trackNumber":4},
+                {"id":"apple-track-album-b","discNumber":2,"trackNumber":7}]},
+            {"id":"apple-album-empty","kind":"album","complete":false,"tracks":[]}]);
+        this.native=Arc::new(Fake(Mutex::new(Some(Ok(collections.clone())))));this.sync();
+        let status=this.status();
+        assert_eq!(status["playlistCount"],2);assert_eq!(status["albumCount"],2);
+        assert_eq!(status["unconfirmedPlaylistCount"],1);assert_eq!(status["unconfirmedAlbumCount"],1);
+        assert_eq!(status["trackCount"],3);
+        assert_eq!(this.albums(),collections.as_array().unwrap().clone());
+        assert_eq!(Apple::new(dir.path()).unwrap().albums(),this.albums());
+        let before=std::fs::read(this.dir.join("library.json")).unwrap();
+        this.native=Arc::new(Fake(Mutex::new(Some(Err("album page failed".into())))));this.sync();
+        assert_eq!(std::fs::read(this.dir.join("library.json")).unwrap(),before);
+        assert_eq!(this.albums(),collections.as_array().unwrap().clone());
+        assert_eq!(this.status()["job"]["error"],"album page failed");
     }
     #[test]
     fn first_sync_is_visible_but_an_explicit_disabled_preference_survives_restart() {
