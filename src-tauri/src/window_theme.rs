@@ -16,6 +16,10 @@ pub fn set_window_theme(window: Window, theme: WindowTheme) -> Result<(), String
     };
     // On macOS this sets this application's NSAppearance, never the OS theme.
     // Retain the standard titlebar and its native window controls.
-    window.set_theme(Some(appearance)).map_err(|e| e.to_string())?;
-    window.set_background_color(Some(background)).map_err(|e| e.to_string())
+    window
+        .set_theme(Some(appearance))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_background_color(Some(background))
+        .map_err(|e| e.to_string())
 }
