@@ -41,6 +41,24 @@ private func digest(_ fields: [String]) -> String {
 
 @available(macOS 14.0, *)
 @MainActor private final class AppleBridge {
+    // Temporary, count-only investigation; remove before final delivery.
+    var diagnosticSync = 0
+    func traceRefresh(_ message: String) {
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/com.rhine.music.preview/apple/issue40-refresh.log")
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+        }
+        if let file = try? FileHandle(forWritingTo: url) {
+            defer { try? file.close() }
+            _ = try? file.seekToEnd()
+            try? file.write(contentsOf: Data(("time=\(Date().timeIntervalSince1970) sync=\(diagnosticSync) \(message)\n").utf8))
+        }
+    }
+    func relationCounts(_ playlist: Playlist) -> String {
+        "entries=\(playlist.entries?.count ?? -1) entriesMore=\(playlist.entries?.hasNextBatch ?? false) tracks=\(playlist.tracks?.count ?? -1) tracksMore=\(playlist.tracks?.hasNextBatch ?? false)"
+    }
+
     static let shared = AppleBridge()
     struct Item { let track: Track; let json: [String: Any]; let supported: Bool }
     var items: [String: Item] = [:]
@@ -64,11 +82,14 @@ private func digest(_ fields: [String]) -> String {
     }
     func all<T: MusicItem>(_ initial: MusicItemCollection<T>) async throws -> [T] {
         var batch = initial, result = Array(initial)
+        traceRefresh("page=0 count=\(batch.count) more=\(batch.hasNextBatch)")
+        var page = 0
         while batch.hasNextBatch {
             guard let next = try await batch.nextBatch(limit: 100), !next.isEmpty else {
                 throw failure("Apple Music 分页未完成，已保留上次完整曲库")
             }
-            result.append(contentsOf: next); batch = next
+            result.append(contentsOf: next); batch = next; page += 1
+            traceRefresh("page=\(page) count=\(batch.count) more=\(batch.hasNextBatch)")
         }
         return result
     }
@@ -84,21 +105,45 @@ private func digest(_ fields: [String]) -> String {
     }
     func sync() async throws -> [[String: Any]] {
         try checkAuthorization()
+        diagnosticSync += 1
+        traceRefresh("begin")
         guard !syncing else { throw failure("资料库正在同步") }
         syncing = true; completed = 0; total = 0
-        defer { syncing = false }
+        defer { syncing = false; traceRefresh("end") }
         var request = MusicLibraryRequest<Playlist>(); request.limit = 100
         let response = try await request.response()
         let playlists = try await all(response.items)
         total = playlists.count
+        traceRefresh("libraryCount=\(playlists.count)")
         var nextItems: [String: Item] = [:], nextAlbums: [[String: Any]] = []
-        for playlist in playlists {
+        for (ordinal, playlist) in playlists.enumerated() {
+            traceRefresh("ordinal=\(ordinal) stage=base \(relationCounts(playlist))")
             let e = try await playlist.with(.entries, preferredSource: .library)
             let t = try await playlist.with(.tracks, preferredSource: .library)
+            traceRefresh("ordinal=\(ordinal) stage=original-entry \(relationCounts(e))")
+            traceRefresh("ordinal=\(ordinal) stage=original-track \(relationCounts(t))")
             guard let entryCollection = e.entries, let trackCollection = t.tracks else {
                 throw failure("歌单内容暂时不可用，已保留上次完整曲库")
             }
             let entries = try await all(entryCollection), tracks = try await all(trackCollection)
+            traceRefresh("ordinal=\(ordinal) stage=separate entries=\(entries.count) tracks=\(tracks.count)")
+            if entries.isEmpty && tracks.isEmpty {
+                var freshRequest = MusicLibraryRequest<Playlist>(); freshRequest.limit = 1
+                freshRequest.filter(matching: \.id, equalTo: playlist.id)
+                let freshResponse = try await freshRequest.response()
+                guard let fresh = freshResponse.items.first, fresh.id == playlist.id else {
+                    traceRefresh("ordinal=\(ordinal) stage=exact missing")
+                    throw failure("新增歌单内容暂未就绪，已保留完整曲库；请稍后再同步")
+                }
+                traceRefresh("ordinal=\(ordinal) stage=exact-base \(relationCounts(fresh))")
+                let combined = try await fresh.with(.entries, .tracks, preferredSource: .library)
+                traceRefresh("ordinal=\(ordinal) stage=combined \(relationCounts(combined))")
+                if let collection = combined.entries { traceRefresh("ordinal=\(ordinal) stage=combined-all entries=\(try await all(collection).count)") }
+                if let collection = combined.tracks { traceRefresh("ordinal=\(ordinal) stage=combined-all tracks=\(try await all(collection).count)") }
+                // Investigation never overwrites a saved valid library with
+                // an unclassified empty response, even if a comparison differs.
+                throw failure("新增歌单内容暂未就绪，已保留完整曲库；请稍后再同步")
+            }
             guard entries.count == tracks.count,
                   zip(entries, tracks).allSatisfy({ $0.title == $1.title && $0.artistName == $1.artistName }) else {
                 throw failure("歌单顺序无法核对，已保留上次完整曲库")
