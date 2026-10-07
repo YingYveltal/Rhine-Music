@@ -68,7 +68,7 @@ test('sync completion refreshes cards, and display toggle sends the selected boo
   assert.equal(env.calls.at(-1).operation, 'sync');
   env.calls.at(-1).resolve({ ...authorized, job: { ...base.job, running: true } }); await settle();
   assert.equal(env.refreshed, 1); assert.equal(env.nodes.get('#apple-sync').disabled, true);
-  assert.match(env.nodes.get('#apple-feedback').textContent, /正在同步歌单/);
+  assert.match(env.nodes.get('#apple-feedback').textContent, /正在同步资料库/);
   await env.tick();
   env.calls.at(-1).resolve({ ...authorized, playlistCount: 2, trackCount: 8, updatedAt: '2026-10-07T00:00:00Z' }); await settle();
   assert.equal(env.refreshed, 2); assert.equal(env.nodes.get('#apple-sync').disabled, false);

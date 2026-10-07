@@ -1,3 +1,4 @@
+import { isApplePlaylist, appleCollectionLabel, appleDiscSummary, appleTrackNumber, appleDiscHeading } from "./apple-collection";
 import "@kitlangton/rolling-number/styles.css";
 import "./style.css";
 import "./quality-settings.css";
@@ -623,7 +624,7 @@ function updateStatus() {
   const label = !apiAvailable
     ? "本地音乐服务尚未连接"
     : library.apple?.job.running
-      ? `${library.apple.job.message || "同步 Apple Music 歌单"}…`
+      ? `${library.apple.job.message || "同步 Apple Music 资料库"}…`
     : library.qq?.job.running
       ? `${library.qq.job.message || "同步 QQ 曲库"}…`
       : library.scan.running
@@ -671,10 +672,10 @@ function updateSelection(navigation?: ArchiveNavigation) {
       genreName: archiveColumns[location.lane],
       format: demo
         ? "DEMO"
-        : a.source === "apple" ? "Apple Music 歌单" : [...new Set(a.tracks.map((t) => t.format))].join(" / "),
+        : a.source === "apple" ? appleCollectionLabel(a) : [...new Set(a.tracks.map((t) => t.format))].join(" / "),
       artist: a.artist,
       meta: [
-        a.source === "apple" ? "个人歌单" : a.year ? String(a.year) : "年份未提供",
+        isApplePlaylist(a) ? "个人歌单" : a.year ? String(a.year) : "年份未提供",
         demo ? "演示封面" : `${a.tracks.length} 首曲目`,
         a.tracks.length ? time(albumDuration(a)) : "",
       ]
@@ -823,7 +824,7 @@ function renderDetail() {
   if (!a) return;
   trackFocus.cancel();
   const apple = a.source === "apple";
-  const discs = apple ? 1 :
+  const discs = isApplePlaylist(a) ? 1 :
     a.discCount || Math.max(1, ...a.tracks.map((t) => t.discNumber || 1));
   const bits =
     a.tracks.length && a.tracks.every((t) => t.lossless === false)
@@ -841,7 +842,8 @@ function renderDetail() {
     (n) => `${Math.round(n / 1000)} kbps`,
   );
   const fields = apple ? [
-    ["SOURCE / 来源", "Apple Music 歌单"],
+    ["SOURCE / 来源", appleCollectionLabel(a)],
+    ...(!isApplePlaylist(a) ? [["RELEASE / 发行年份", a.year || "未提供"], ["DISCS / 碟号", appleDiscSummary(a)]] : []),
     ["TRACKS / 曲目", `${a.tracks.length} 首${a.complete === false ? (a.tracks.length ? "（部分内容）" : "（未确认）") : ""}`],
     ["DURATION / 总时长", time(albumDuration(a))],
   ] : [
@@ -858,10 +860,10 @@ function renderDetail() {
     sameAlbum = detailIdentity === a.id,
     scroll = sameAlbum ? article.scrollTop : 0;
   detailIdentity = a.id;
-  article.innerHTML = `<div class="detail-overline"><span>${apple ? "PLAYLIST" : "ALBUM"} ${String(selected + 1).padStart(3, "0")}</span><div class="detail-album-navigation" role="group" aria-label="切换专辑"><button data-action="prev" aria-label="上一张专辑">↑ 上一张</button><button data-action="next" aria-label="下一张专辑">下一张 ↓</button></div></div>
+  article.innerHTML = `<div class="detail-overline"><span>${isApplePlaylist(a) ? "PLAYLIST" : "ALBUM"} ${String(selected + 1).padStart(3, "0")}</span><div class="detail-album-navigation" role="group" aria-label="切换专辑"><button data-action="prev" aria-label="上一张专辑">↑ 上一张</button><button data-action="next" aria-label="下一张专辑">下一张 ↓</button></div></div>
     <h1 title="${esc(a.title)}">${albumTitleMarkup(a.title)}</h1><p class="detail-artist">${esc(a.artist)}${!apple && a.offline ? '<span class="offline-badge">目录离线</span>' : ""}</p>
     <div class="album-facts">${fields.map(([name, value]) => `<div><small>${name}</small><span>${esc(String(value))}</span></div>`).join("")}</div>
-    <div class="music-tabs" role="tablist" aria-label="专辑信息"><button role="tab" id="tab-tracks" data-tab="tracks" tabindex="${activeTab === "tracks" ? 0 : -1}" aria-selected="${activeTab === "tracks"}" aria-controls="album-tab-content"><span>01</span> 歌单</button><button role="tab" id="tab-about" data-tab="about" tabindex="${activeTab === "about" ? 0 : -1}" aria-selected="${activeTab === "about"}" aria-controls="album-tab-content"><span>02</span> ${apple ? "歌单信息" : "专辑介绍"}</button><i class="music-tab-indicator" aria-hidden="true"></i></div>
+    <div class="music-tabs" role="tablist" aria-label="专辑信息"><button role="tab" id="tab-tracks" data-tab="tracks" tabindex="${activeTab === "tracks" ? 0 : -1}" aria-selected="${activeTab === "tracks"}" aria-controls="album-tab-content"><span>01</span> ${apple && !isApplePlaylist(a) ? "曲目" : "歌单"}</button><button role="tab" id="tab-about" data-tab="about" tabindex="${activeTab === "about" ? 0 : -1}" aria-selected="${activeTab === "about"}" aria-controls="album-tab-content"><span>02</span> ${isApplePlaylist(a) ? "歌单信息" : "专辑介绍"}</button><i class="music-tab-indicator" aria-hidden="true"></i></div>
     <div id="album-tab-content" role="tabpanel" aria-labelledby="tab-${activeTab}">${activeTab === "tracks" ? trackList(a, discs) : albumAbout(a)}</div>`;
   article.scrollTop = scroll;
   syncTabIndicator(false);
@@ -873,27 +875,26 @@ function renderDetail() {
 }
 function trackList(a: MusicAlbum, discs: number) {
   const apple = a.source === "apple";
-  if (apple) discs = 1;
+  if (isApplePlaylist(a)) discs = 1;
   const notice = apple && (a.complete === false || a.loadError)
-    ? `<p role="status">${esc(a.loadError || "歌单尚未完整同步，仅显示已读取的曲目。")}</p><button data-action="library" class="text-button">重新同步歌单 ↗</button>` : "";
-  if (apple && !a.tracks.length) return `<div class="empty-tracks"><strong>${a.complete === false || a.loadError ? "本次未读取到歌曲" : "这个歌单暂时没有歌曲"}</strong>${notice || '<p>可在“音乐”App 中添加歌曲后重新同步。</p><button data-action="library">打开音乐库 ↗</button>'}</div>`;
+    ? `<p role="status">${esc(a.loadError || "本次内容尚未确认，仅显示已读取的曲目。")}</p><button data-action="library" class="text-button">重新同步资料库 ↗</button>` : "";
+  if (apple && !a.tracks.length) return `<div class="empty-tracks"><strong>${a.complete === false || a.loadError ? "本次未读取到歌曲" : `这个${isApplePlaylist(a) ? "歌单" : "专辑"}暂时没有歌曲`}</strong>${notice || '<p>可在“音乐”App 中添加歌曲后重新同步。</p><button data-action="library">打开音乐库 ↗</button>'}</div>`;
   if (!a.tracks.length)
     return `<div class="empty-tracks"><strong>${demo ? "这是一张封面演示卡片" : "这个专辑还没有可播放曲目"}</strong><p>${demo ? "用于检查封面原始比例与卡片材质。扫描本地音乐库后，这里会显示真实曲目。" : "请检查音乐文件是否完整，并重新扫描音乐库。"}</p><button data-action="library">打开音乐库设置 ↗</button></div>`;
   let disc = -1;
-  return `${notice}<div class="track-list" aria-label="${apple ? "歌单" : "专辑"}歌曲列表">${a.tracks
+  return `${notice}<div class="track-list" aria-label="${isApplePlaylist(a) ? "歌单" : "专辑"}歌曲列表">${a.tracks
     .map((t, index) => {
       const discNo = apple ? 1 : t.discNumber || 1;
-      const head =
-        discs > 1 && discNo !== disc
-          ? `<div class="disc-heading">DISC ${String(discNo).padStart(2, "0")}</div>`
-          : "";
+      const heading = apple ? appleDiscHeading(a, index) :
+        discs > 1 && discNo !== disc ? `DISC ${String(discNo).padStart(2, "0")}` : "";
+      const head = heading ? `<div class="disc-heading">${esc(heading)}</div>` : "";
       disc = discNo;
-      return `${head}<button class="track-row" data-track="${esc(t.id)}" ${(!apple && a.offline) || (apple && !isNative) ? "disabled" : ""} aria-label="播放 ${esc(t.title)}"><span class="track-number">${String(apple ? index + 1 : t.trackNumber || index + 1).padStart(2, "0")}</span><span class="track-name"><strong>${esc(t.title)}</strong><small>${esc(t.artist)}</small></span><span class="track-format">${esc(apple ? "Apple Music" : t.format)}${!apple && !t.browserPlayable ? '<i title="需要兼容的播放内核"> ↗</i>' : ""}</span><span class="track-duration">${t.duration > 0 ? time(t.duration) : "—"}</span></button>`;
+      return `${head}<button class="track-row" data-track="${esc(t.id)}" ${(!apple && a.offline) || (apple && !isNative) ? "disabled" : ""} aria-label="播放 ${esc(t.title)}"><span class="track-number">${apple ? appleTrackNumber(a, t, index) : String(t.trackNumber || index + 1).padStart(2, "0")}</span><span class="track-name"><strong>${esc(t.title)}</strong><small>${esc(t.artist)}</small></span><span class="track-format">${esc(apple ? "Apple Music" : t.format)}${!apple && !t.browserPlayable ? '<i title="需要兼容的播放内核"> ↗</i>' : ""}</span><span class="track-duration">${t.duration > 0 ? time(t.duration) : "—"}</span></button>`;
     })
     .join("")}</div>${producerBlock(a)}`;
 }
 function albumAbout(a: MusicAlbum) {
-  if (a.source === "apple") return `<section class="album-about"><small>APPLE MUSIC · 个人歌单</small><p>${esc(a.description || "来自自己的 Apple Music 音乐资料库。")}</p>${a.complete === false || a.loadError ? `<p>${esc(a.loadError || "此歌单尚未完整同步。")}</p>` : ""}</section>`;
+  if (a.source === "apple") return `<section class="album-about"><small>APPLE MUSIC · ${isApplePlaylist(a) ? "个人歌单" : "资料库专辑"}</small><p>${esc(a.description || (isApplePlaylist(a) ? "来自自己的 Apple Music 音乐资料库。" : "仅显示已加入自己 Apple Music 资料库的曲目，保留资料库提供的碟号与曲号。"))}</p>${a.complete === false || a.loadError ? `<p>${esc(a.loadError || "本次内容尚未确认。")}</p>` : ""}</section>`;
   if (a.id.startsWith("qq-")) return `<section class="album-about"><small>QQ MUSIC</small><p>${esc(a.description || "来自 QQ 音乐")}</p><p>歌曲顺序及重复条目保持歌单原样。缺少在线编号的曲目可通过本地文件导入播放。</p></section>`;
   return `<section class="album-about"><small>ABOUT THIS ALBUM</small>
     ${a.description ? `<p>${esc(a.description)}</p>${a.descriptionSource ? `<a class="text-button" href="${esc(a.descriptionSource.url)}" target="_blank" rel="noopener">来源：${esc(a.descriptionSource.name)} ↗</a>${a.descriptionSource.license ? `<small class="introduction-license">${esc(a.descriptionSource.license)}</small>` : ""}` : ""}` : `<h3>专辑介绍待补充</h3><p>从公开百科核对专辑与歌手后读取介绍，附上来源并保存在本机。无法确认对应专辑时保留空白。</p>`}
@@ -1126,7 +1127,7 @@ function openPanel(next: Panel) {
 }
 function renderLibraryPanel() {
   $("#panel-body").innerHTML =
-    `<p class="panel-intro">根目录中的每首单曲各是一张卡片，优先使用自身内嵌封面。子文件夹按专辑展示，优先使用文件夹封面。</p><label class="field-label" for="music-roots">音乐文件夹<span>多个目录各占一行</span></label><textarea id="music-roots" rows="3" placeholder="/Users/你的用户名/Music">${esc(library.roots.map((r) => r.path).join("\n"))}</textarea><div class="panel-actions">${isNative ? '<button data-action="pick-folders">选择文件夹…</button>' : ""}<button class="primary-button" data-action="scan">保存目录并扫描 ↗</button><button data-action="rescan">重新扫描</button></div>${isNative ? '<p id="folder-picker-status" role="status" aria-live="polite">可选择多个文件夹；添加后点击“保存目录并扫描”。也可直接编辑上方路径。</p>' : ""}<div id="scan-status" class="scan-status"></div><div class="library-metrics"><div><b>${library.albums.length}</b><span>专辑</span></div><div><b>${library.albums.reduce((n, a) => n + a.tracks.length, 0)}</b><span>曲目</span></div><div><b>${library.genres.filter((g) => library.albums.some((a) => a.genreId === g.id)).length}</b><span>流派</span></div></div><section class="panel-section"><h3>在线资料与本地分类</h3><p>向 MusicBrainz 查询专辑名称与艺术家，补充流派和制作人员；音乐文件留在本机。已有资料使用缓存，人工分类优先保留。</p><button data-action="enrich-library" class="text-button">补充缺失的在线资料 ↗</button><button data-action="edit-genres" class="text-button">编辑流派归并规则 ↗</button></section><section class="panel-section"><h3>封面显示</h3><p>方形、竖版、横版封面均保持原始比例，完整放入卡片正面。Apple Music 歌单优先显示自身封面，缺失或加载失败时使用第一首歌曲的专辑封面；仍无可用封面时显示专辑名称占位。</p>${!library.albums.length ? '<button data-action="demo" class="text-button">查看演示封面 ↗</button>' : ""}</section>`;
+    `<p class="panel-intro">根目录中的每首单曲各是一张卡片，优先使用自身内嵌封面。子文件夹按专辑展示，优先使用文件夹封面。</p><label class="field-label" for="music-roots">音乐文件夹<span>多个目录各占一行</span></label><textarea id="music-roots" rows="3" placeholder="/Users/你的用户名/Music">${esc(library.roots.map((r) => r.path).join("\n"))}</textarea><div class="panel-actions">${isNative ? '<button data-action="pick-folders">选择文件夹…</button>' : ""}<button class="primary-button" data-action="scan">保存目录并扫描 ↗</button><button data-action="rescan">重新扫描</button></div>${isNative ? '<p id="folder-picker-status" role="status" aria-live="polite">可选择多个文件夹；添加后点击“保存目录并扫描”。也可直接编辑上方路径。</p>' : ""}<div id="scan-status" class="scan-status"></div><div class="library-metrics"><div><b>${library.albums.length}</b><span>专辑</span></div><div><b>${library.albums.reduce((n, a) => n + a.tracks.length, 0)}</b><span>曲目</span></div><div><b>${library.genres.filter((g) => library.albums.some((a) => a.genreId === g.id)).length}</b><span>流派</span></div></div><section class="panel-section"><h3>在线资料与本地分类</h3><p>向 MusicBrainz 查询专辑名称与艺术家，补充流派和制作人员；音乐文件留在本机。已有资料使用缓存，人工分类优先保留。</p><button data-action="enrich-library" class="text-button">补充缺失的在线资料 ↗</button><button data-action="edit-genres" class="text-button">编辑流派归并规则 ↗</button></section><section class="panel-section"><h3>封面显示</h3><p>方形、竖版、横版封面均保持原始比例，完整放入卡片正面。Apple Music 专辑和歌单优先显示自身封面，缺失或加载失败时使用第一首歌曲的专辑封面；仍无可用封面时显示专辑名称占位。</p>${!library.albums.length ? '<button data-action="demo" class="text-button">查看演示封面 ↗</button>' : ""}</section>`;
   if (isNative) {
     const qqSection = document.createElement("section");
     qqSection.id = "qq-connection"; qqSection.className = "panel-section";
@@ -1198,7 +1199,7 @@ function renderSearchResults() {
   for (const a of albums) {
     if (searchGenre && a.genreId !== searchGenre) continue;
     if (!query || `${a.title} ${a.artist} ${genreName(a.genreId)}`.toLocaleLowerCase().includes(query)) {
-      results.push(`<button class="album-result" data-album="${esc(a.id)}"><span class="result-cover">${cover(a)}</span><span class="result-copy"><strong>${esc(a.title)}</strong><small>${esc(a.artist)} · ${esc(genreName(a.genreId))}</small></span><em>专辑</em><i>↗</i></button>`);
+      results.push(`<button class="album-result" data-album="${esc(a.id)}"><span class="result-cover">${cover(a)}</span><span class="result-copy"><strong>${esc(a.title)}</strong><small>${esc(a.artist)} · ${esc(genreName(a.genreId))}</small></span><em>${isApplePlaylist(a) ? "歌单" : "专辑"}</em><i>↗</i></button>`);
     }
     if (!query) continue;
     for (const track of a.tracks) {

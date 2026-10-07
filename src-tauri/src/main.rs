@@ -95,6 +95,7 @@ fn snapshot(core: &Core, app: &tauri::AppHandle) -> Result<Value> {
         albums.as_array_mut().unwrap().push(album);
     }
     genres.push(library::Genre{id:"apple-playlists".into(),name:"Apple Music 歌单".into(),aliases:vec![]});
+    genres.push(library::Genre{id:"apple-albums".into(),name:"Apple Music 专辑".into(),aliases:vec![]});
     Ok(
         json!({"version":1,"albums":albums,"genres":genres,"qq":core.qq.status(),"apple":core.apple.status(),"roots":lib.config.roots.iter().map(|path|lib.index.roots.iter().find(|r|&r.path==path).map(|r|serde_json::to_value(r).unwrap()).unwrap_or(json!({"path":path,"status":"unscanned"}))).collect::<Vec<_>>(),"scan":if jobs.scan.is_null(){json!({"running":false})}else{jobs.scan.clone()},"enrich":if jobs.enrich.is_null(){json!({"running":false,"completed":0,"total":0})}else{jobs.enrich.clone()},"introductions":if jobs.introductions.is_null(){json!({"running":false,"completed":0,"total":0,"updated":0,"notFound":0,"failed":0})}else{jobs.introductions.clone()},"onlineEnabled":lib.config.online_enabled}),
     )
