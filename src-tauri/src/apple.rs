@@ -11,6 +11,7 @@ pub struct MusicKit;
 extern "C" {
     fn rhine_apple_request(json: *const std::ffi::c_char, context: *mut std::ffi::c_void,
         callback: extern "C" fn(*mut std::ffi::c_void, *const std::ffi::c_char));
+    fn rhine_apple_artwork_valid(bytes: *const u8, count: usize) -> u8;
 }
 #[cfg(target_os = "macos")]
 extern "C" fn reply(context: *mut std::ffi::c_void, raw: *const std::ffi::c_char) {
@@ -43,6 +44,41 @@ impl Native for MusicKit {
     }
 }
 fn receive(rx: Response) -> Result<Value> { rx.recv().context("Apple Music 连接已结束")?.map_err(anyhow::Error::msg) }
+
+fn valid_artwork(bytes: &[u8]) -> bool {
+    if bytes.is_empty() || bytes.len() >= 10_000_000 { return false; }
+    #[cfg(target_os = "macos")]
+    { unsafe { rhine_apple_artwork_valid(bytes.as_ptr(), bytes.len()) != 0 } }
+    #[cfg(not(target_os = "macos"))]
+    { false }
+}
+
+// A failed cover is optional metadata: try the first song, then keep the
+// existing placeholder. Never publish an invalid or partially written file.
+fn cache_artwork(album: &mut Value, root: &Path, mut fetch: impl FnMut(&str) -> Result<Vec<u8>>) {
+    let urls: Vec<String> = ["artworkURL", "firstTrackArtworkURL"].iter()
+        .filter_map(|key| album[*key].as_str().filter(|url| !url.is_empty()).map(str::to_owned)).collect();
+    let Some(object) = album.as_object_mut() else { return; };
+    object.remove("nativeCoverPath");
+    object.remove("artworkURL");
+    object.remove("firstTrackArtworkURL");
+    let mut previous = None;
+    for url in urls {
+        if previous.as_ref() == Some(&url) { continue; }
+        let path = root.join(format!("{}.img", hash(&url)));
+        previous = Some(url.clone());
+        let cached = std::fs::read(&path).ok().is_some_and(|bytes| valid_artwork(&bytes));
+        let available = cached || (|| -> Result<bool> {
+            let bytes = fetch(&url)?;
+            if !valid_artwork(&bytes) { return Ok(false); }
+            let temporary = path.with_extension("tmp");
+            std::fs::write(&temporary, bytes)?;
+            std::fs::rename(&temporary, &path)?;
+            Ok(true)
+        })().unwrap_or(false);
+        if available { object.insert("nativeCoverPath".into(), json!(path)); break; }
+    }
+}
 
 struct Cache { albums: Vec<Value>, enabled: bool, updated_at: Option<String>, status: Value }
 pub struct Apple { dir: PathBuf, cache: Mutex<Cache>, pub native: Arc<dyn Native> }
@@ -115,17 +151,13 @@ impl Apple {
             let mut albums=value.as_array().context("歌单响应格式错误")?.clone();
             let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12)).build()?;
             for album in &mut albums {
-                if let Some(url)=album["artworkURL"].as_str() {
-                    let path=self.cover_root().join(format!("{}.img",hash(url)));
-                    if !path.is_file() {
-                        // Artwork comes from MusicKit; cover failure must not discard playable songs.
-                        if let Ok(response)=client.get(url).send().and_then(|r|r.error_for_status()) {
-                            if let Ok(bytes)=response.bytes() { if bytes.len()<10_000_000 { let _=std::fs::write(&path,bytes); } }
-                        }
-                    }
-                    if path.is_file() { album["nativeCoverPath"]=json!(path); }
-                }
-                if let Some(o)=album.as_object_mut(){o.remove("artworkURL");}
+                cache_artwork(album, &self.cover_root(), |url| {
+                    let mut response = client.get(url).send()?.error_for_status()?;
+                    let mut bytes = Vec::new();
+                    use std::io::Read;
+                    response.by_ref().take(10_000_000).read_to_end(&mut bytes)?;
+                    Ok(bytes)
+                });
             }
             Ok(albums)
         })();
@@ -147,6 +179,69 @@ impl Apple {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn artwork_png() -> Vec<u8> {
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNw6TgDAAKsAZkaoN/PAAAAAElFTkSuQmCC").unwrap()
+    }
+    #[test]
+    fn playlist_artwork_wins_without_fetching_first_song_and_reuses_valid_cache() {
+        let dir=tempfile::tempdir().unwrap();
+        let mut album=json!({"artworkURL":"playlist","firstTrackArtworkURL":"first","tracks":[{"id":"first"}]});
+        let mut fetched=vec![];
+        cache_artwork(&mut album,dir.path(),|url|{fetched.push(url.to_owned());Ok(artwork_png())});
+        assert_eq!(fetched,vec!["playlist"]);
+        assert_eq!(album["nativeCoverPath"],json!(dir.path().join(format!("{}.img",hash("playlist")))));
+        assert!(album.get("artworkURL").is_none() && album.get("firstTrackArtworkURL").is_none());
+        let mut again=json!({"artworkURL":"playlist","firstTrackArtworkURL":"first"});
+        cache_artwork(&mut again,dir.path(),|_|panic!("valid cached image must not be downloaded again"));
+        assert_eq!(again["nativeCoverPath"],album["nativeCoverPath"]);
+    }
+    #[test]
+    fn missing_playlist_artwork_uses_only_the_provided_first_song() {
+        let dir=tempfile::tempdir().unwrap();
+        let mut album=json!({"firstTrackArtworkURL":"first","tracks":[{"id":"first"},{"id":"second"}]});
+        let tracks=album["tracks"].clone();
+        cache_artwork(&mut album,dir.path(),|url|{assert_eq!(url,"first");Ok(artwork_png())});
+        assert_eq!(album["nativeCoverPath"],json!(dir.path().join(format!("{}.img",hash("first")))));
+        assert_eq!(album["tracks"],tracks);
+    }
+    #[test]
+    fn failed_or_invalid_original_artwork_falls_back_and_rejects_corrupt_cache() {
+        for failure in ["network","html","empty"] {
+            let dir=tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join(format!("{}.img",hash("playlist"))),b"broken cached image").unwrap();
+            let mut album=json!({"artworkURL":"playlist","firstTrackArtworkURL":"first"});
+            let mut fetched=vec![];
+            cache_artwork(&mut album,dir.path(),|url| {
+                fetched.push(url.to_owned());
+                if url=="first" { return Ok(artwork_png()); }
+                match failure { "network"=>bail!("synthetic failure"), "html"=>Ok(b"<html>failure</html>".to_vec()), _=>Ok(vec![]) }
+            });
+            assert_eq!(fetched,vec!["playlist","first"]);
+            assert_eq!(album["nativeCoverPath"],json!(dir.path().join(format!("{}.img",hash("first")))));
+        }
+    }
+    #[test]
+    fn absent_artwork_or_two_failures_leave_placeholder_and_playback_metadata_intact() {
+        let dir=tempfile::tempdir().unwrap();
+        for tracks in [json!([]),json!([{"id":"first","sourcePosition":0,"browserPlayable":false}])] {
+            for candidates in [false,true] {
+                let mut album=json!({"tracks":tracks,"snapshotRevision":"unchanged","nativeCoverPath":"stale"});
+                if candidates {album["artworkURL"]=json!("playlist");album["firstTrackArtworkURL"]=json!("first");}
+                cache_artwork(&mut album,dir.path(),|_|{assert!(candidates);bail!("synthetic failure")});
+                assert!(album.get("nativeCoverPath").is_none());
+                assert_eq!(album["tracks"],tracks);assert_eq!(album["snapshotRevision"],"unchanged");
+            }
+        }
+    }
+    #[test]
+    fn artwork_cache_write_failure_is_nonfatal() {
+        let dir=tempfile::tempdir().unwrap();let blocked=dir.path().join("not-a-directory");
+        std::fs::write(&blocked,b"occupied").unwrap();
+        let mut album=json!({"artworkURL":"playlist","firstTrackArtworkURL":"first","tracks":[{"id":"first"}]});
+        cache_artwork(&mut album,&blocked,|_|Ok(artwork_png()));
+        assert!(album.get("nativeCoverPath").is_none());assert_eq!(album["tracks"][0]["id"],"first");
+    }
     struct Fake(Mutex<Option<Result<Value,String>>>);
     impl Native for Fake {
         fn call(&self, _: &str, _: Value) -> Response {

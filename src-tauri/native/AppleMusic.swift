@@ -1,6 +1,16 @@
 import Foundation
 import MusicKit
 import CryptoKit
+import ImageIO
+
+// Validate downloaded/cached artwork before exposing it to all frontend views.
+@_cdecl("rhine_apple_artwork_valid")
+func rhineAppleArtworkValid(_ bytes: UnsafePointer<UInt8>, _ count: Int) -> UInt8 {
+    let data = Data(bytes: bytes, count: count)
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+          CGImageSourceCreateImageAtIndex(source, 0, nil) != nil else { return 0 }
+    return 1
+}
 
 private func failure(_ message: String) -> NSError {
     NSError(domain: "RhineApple", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
@@ -86,6 +96,12 @@ private func digest(_ fields: [String]) -> String {
                 "folder": "", "tracks": rows, "producers": [], "offline": false, "complete": true,
                 "loadError": NSNull(), "snapshotRevision": revision]
             if let url = playlist.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
+            // Only the original first entry's song artwork is eligible. Do not
+            // scan later tracks, substitute a music-video thumbnail, or search.
+            if let first = tracks.first, case .song(let song) = first,
+               let url = song.artwork?.url(width: 600, height: 600) {
+                album["firstTrackArtworkURL"] = url.absoluteString
+            }
             nextAlbums.append(album); completed += 1
         }
         // Publish only a complete snapshot. An active queue keeps its own objects.
