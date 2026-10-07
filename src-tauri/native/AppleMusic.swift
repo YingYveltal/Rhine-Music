@@ -3,24 +3,6 @@ import MusicKit
 import CryptoKit
 import ImageIO
 
-private let artworkTraceLock = NSLock()
-private func artworkTrace(_ message: String) {
-    artworkTraceLock.lock(); defer { artworkTraceLock.unlock() }
-    let url = URL(fileURLWithPath: "/tmp/rhine-issue38-artwork-diagnostic.log")
-    if !FileManager.default.fileExists(atPath: url.path) { FileManager.default.createFile(atPath: url.path, contents: nil) }
-    if let file = try? FileHandle(forWritingTo: url) {
-        defer { try? file.close() }
-        _ = try? file.seekToEnd(); try? file.write(contentsOf: Data((message + "\n").utf8))
-    }
-}
-@_cdecl("rhine_apple_artwork_trace")
-func rhineAppleArtworkTrace(_ raw: UnsafePointer<CChar>) { artworkTrace(String(cString: raw)) }
-@available(macOS 14.0, *)
-private func traceArtwork(_ stage: String, _ artwork: Artwork?) {
-    let url = artwork?.url(width: 600, height: 600)
-    artworkTrace("stage=\(stage) artwork=\(artwork != nil) url=\(url != nil) scheme=\(url?.scheme ?? "none")")
-}
-
 // Validate downloaded/cached artwork before exposing it to all frontend views.
 @_cdecl("rhine_apple_artwork_valid")
 func rhineAppleArtworkValid(_ bytes: UnsafePointer<UInt8>, _ count: Int) -> UInt8 {
@@ -90,51 +72,15 @@ private func digest(_ fields: [String]) -> String {
         }
         return result
     }
-    func firstSongArtworkURL(_ song: Song) async -> URL? {
-        traceArtwork("first-direct", song.artwork)
-        if let url = song.artwork?.url(width: 600, height: 600) { return url }
-        // Playlist relationships may supply a sparse Song. Hydrate only its
-        // exact library identity, never a title/artist search or another track.
-        var full = song
-        var request = MusicLibraryRequest<Song>(); request.limit = 1
-        request.filter(matching: \.id, equalTo: song.id)
-        if let response = try? await request.response(),
-           let match = response.items.first, match.id == song.id { full = match }
-        traceArtwork("first-hydrated", full.artwork)
-        if let url = full.artwork?.url(width: 600, height: 600) { return url }
-        if let detailed = try? await full.with(.albums, preferredSource: .library) {
-            traceArtwork("first-album", detailed.albums?.first?.artwork)
-            return detailed.albums?.first?.artwork?.url(width: 600, height: 600)
-        }
-        artworkTrace("first-album request-failed")
-        return nil
-    }
-    func probeArtworkURL(_ artwork: Artwork?) async {
-        guard let url = artwork?.url(width: 600, height: 600) else { return }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 10
-        configuration.timeoutIntervalForResource = 12
-        let session = URLSession(configuration: configuration)
-        defer { session.invalidateAndCancel() }
-        do {
-            let (data, response) = try await session.data(from: url)
-            artworkTrace("native-session bytes=\(data.count) http=\((response as? HTTPURLResponse)?.statusCode ?? 0)")
-        } catch {
-            let e = error as NSError
-            artworkTrace("native-session error-domain=\(e.domain) code=\(e.code)")
-        }
-        do {
-            let fresh = artwork!.url(width: 600, height: 600)!
-            let (data, response) = try await URLSession.shared.data(for: URLRequest(url: fresh, timeoutInterval: 12))
-            artworkTrace("native-shared bytes=\(data.count) http=\((response as? HTTPURLResponse)?.statusCode ?? 0)")
-            let visible = data.withUnsafeBytes { rhineAppleArtworkValid($0.bindMemory(to: UInt8.self).baseAddress!, data.count) }
-            let source = CGImageSourceCreateWithData(data as CFData, nil)
-            let image = source.flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
-            artworkTrace("native-shared visible=\(visible) width=\(image?.width ?? 0) height=\(image?.height ?? 0)")
-        } catch {
-            let e = error as NSError
-            artworkTrace("native-shared error-domain=\(e.domain) code=\(e.code)")
-        }
+    func artwork(_ body: [String: Any]) async throws -> [String: Any] {
+        guard let raw = body["url"] as? String, let url = URL(string: raw),
+              url.scheme?.lowercased() == "musickit" else { throw failure("封面地址不可用") }
+        // MusicKit's local artwork URLs are supported by the shared native
+        // session, not a new ephemeral session or Rust's HTTP client.
+        let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 12))
+        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode),
+              !data.isEmpty, data.count < 10_000_000 else { throw failure("封面暂不可用") }
+        return ["data": data.base64EncodedString()]
     }
     func sync() async throws -> [[String: Any]] {
         try checkAuthorization()
@@ -174,14 +120,11 @@ private func digest(_ fields: [String]) -> String {
                 "artist": playlist.curatorName ?? "Apple Music", "genreId": "apple-playlists", "rawGenres": [],
                 "folder": "", "tracks": rows, "producers": [], "offline": false, "complete": true,
                 "loadError": NSNull(), "snapshotRevision": revision]
-            traceArtwork("playlist", playlist.artwork)
-            await probeArtworkURL(playlist.artwork)
             if let url = playlist.artwork?.url(width: 600, height: 600) { album["artworkURL"] = url.absoluteString }
             // Only the original first entry's song artwork is eligible. Do not
             // scan later tracks, substitute a music-video thumbnail, or search.
             if let first = tracks.first, case .song(let song) = first {
-                await probeArtworkURL(song.artwork)
-                if let url = await firstSongArtworkURL(song) {
+                if let url = song.artwork?.url(width: 600, height: 600) {
                     album["firstTrackArtworkURL"] = url.absoluteString
                 }
             }
@@ -306,6 +249,7 @@ private func digest(_ fields: [String]) -> String {
             if MusicAuthorization.currentStatus == .notDetermined { _ = await MusicAuthorization.request() }
             return ["authorization": authorization()]
         case "sync": return try await sync()
+        case "artwork": return try await artwork(body)
         case "state": return playback()
         default: try await control(op, body); return playback()
         }

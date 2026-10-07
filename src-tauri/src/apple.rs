@@ -12,7 +12,6 @@ extern "C" {
     fn rhine_apple_request(json: *const std::ffi::c_char, context: *mut std::ffi::c_void,
         callback: extern "C" fn(*mut std::ffi::c_void, *const std::ffi::c_char));
     fn rhine_apple_artwork_valid(bytes: *const u8, count: usize) -> u8;
-    fn rhine_apple_artwork_trace(raw: *const std::ffi::c_char);
 }
 #[cfg(target_os = "macos")]
 extern "C" fn reply(context: *mut std::ffi::c_void, raw: *const std::ffi::c_char) {
@@ -53,11 +52,6 @@ fn valid_artwork(bytes: &[u8]) -> bool {
     #[cfg(not(target_os = "macos"))]
     { false }
 }
-fn trace_artwork(message: &str) {
-    let text=std::ffi::CString::new(message).unwrap();
-    unsafe { rhine_apple_artwork_trace(text.as_ptr()); }
-}
-
 // A failed cover is optional metadata: try the first song, then keep the
 // existing placeholder. Never publish an invalid or partially written file.
 fn cache_artwork(album: &mut Value, root: &Path, mut fetch: impl FnMut(&str) -> Result<Vec<u8>>) {
@@ -75,8 +69,7 @@ fn cache_artwork(album: &mut Value, root: &Path, mut fetch: impl FnMut(&str) -> 
         let cached = std::fs::read(&path).ok().is_some_and(|bytes| valid_artwork(&bytes));
         let available = cached || (|| -> Result<bool> {
             let bytes = fetch(&url)?;
-            if !valid_artwork(&bytes) { trace_artwork("decode=invalid"); return Ok(false); }
-            trace_artwork("decode=valid");
+            if !valid_artwork(&bytes) { return Ok(false); }
             let temporary = path.with_extension("tmp");
             std::fs::write(&temporary, bytes)?;
             std::fs::rename(&temporary, &path)?;
@@ -158,11 +151,13 @@ impl Apple {
             let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12)).build()?;
             for album in &mut albums {
                 cache_artwork(album, &self.cover_root(), |url| {
-                    let sent=client.get(url).send();
-                    if let Err(e)=&sent { trace_artwork(&format!("download-error builder={} timeout={} connect={}",e.is_builder(),e.is_timeout(),e.is_connect())); }
-                    let response=sent?;
-                    trace_artwork(&format!("http-status={}",response.status().as_u16()));
-                    let mut response = response.error_for_status()?;
+                    if reqwest::Url::parse(url)?.scheme() == "musickit" {
+                        use base64::Engine;
+                        let value = receive(self.native.call("artwork", json!({"url":url})))?;
+                        let encoded = value["data"].as_str().context("封面响应格式错误")?;
+                        return Ok(base64::engine::general_purpose::STANDARD.decode(encoded)?);
+                    }
+                    let mut response = client.get(url).send()?.error_for_status()?;
                     let mut bytes = Vec::new();
                     use std::io::Read;
                     response.by_ref().take(10_000_000).read_to_end(&mut bytes)?;
