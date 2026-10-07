@@ -3,12 +3,22 @@ import MusicKit
 import CryptoKit
 import ImageIO
 
+private let artworkTraceLock = NSLock()
+private func artworkTrace(_ message: String) {
+    artworkTraceLock.lock(); defer { artworkTraceLock.unlock() }
+    let url = URL(fileURLWithPath: "/tmp/rhine-issue38-artwork-diagnostic.log")
+    if !FileManager.default.fileExists(atPath: url.path) { FileManager.default.createFile(atPath: url.path, contents: nil) }
+    if let file = try? FileHandle(forWritingTo: url) {
+        defer { try? file.close() }
+        _ = try? file.seekToEnd(); try? file.write(contentsOf: Data((message + "\n").utf8))
+    }
+}
 @_cdecl("rhine_apple_artwork_trace")
-func rhineAppleArtworkTrace(_ raw: UnsafePointer<CChar>) { NSLog("RhineArtwork %@", String(cString: raw)) }
+func rhineAppleArtworkTrace(_ raw: UnsafePointer<CChar>) { artworkTrace(String(cString: raw)) }
 @available(macOS 14.0, *)
 private func traceArtwork(_ stage: String, _ artwork: Artwork?) {
     let url = artwork?.url(width: 600, height: 600)
-    NSLog("RhineArtwork %@ artwork=%d url=%d scheme=%@", stage, artwork != nil ? 1 : 0, url != nil ? 1 : 0, url?.scheme ?? "none")
+    artworkTrace("stage=\(stage) artwork=\(artwork != nil) url=\(url != nil) scheme=\(url?.scheme ?? "none")")
 }
 
 // Validate downloaded/cached artwork before exposing it to all frontend views.
@@ -81,7 +91,7 @@ private func digest(_ fields: [String]) -> String {
             traceArtwork("first-album", detailed.albums?.first?.artwork)
             return detailed.albums?.first?.artwork?.url(width: 600, height: 600)
         }
-        NSLog("RhineArtwork first-album request-failed")
+        artworkTrace("first-album request-failed")
         return nil
     }
     func sync() async throws -> [[String: Any]] {
